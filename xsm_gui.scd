@@ -27,6 +27,7 @@ var synthParams = ( // synths dictionary
 	);
 
 // MIDI/Controls containers.
+var makeMIDI;
 var midiMapCC=#[ // for XSession - continous control
     24, 25, 26, 12, // Knobs 1, 2, 3 Left
     27, 28, 29, 11, // Knobs Hi, Mid, Low Left
@@ -59,7 +60,6 @@ var midiNoteOnMap = Dictionary[ // for XSession - note on
 var ctrlsList=Array.fill(midiMapCC.size, {nil});
 var ctlBus=Array.fill(midiMapCC.size, {Bus.control(s)});
 var currCtrl=0;
-var ccResp_xSessionPro, nOnResp_xSessionPro, xSessionPro= -1410198277;
 
 // Plates and decks.
 var plates = List.new;
@@ -72,6 +72,9 @@ var changeSynth = { |deck, plate=0|
         plate
     );
 };
+
+// Control flow.
+var cleanup;
 
 // GUI.
 var win;
@@ -163,6 +166,24 @@ var button = { |par, label, action, scaleW=1, scaleH=1, colorLabel, colorBg|
     // .action_({ |bt| action.(bt.value) })
     .canFocus_(false);
 };
+var dropdown = { |par, label, items, action, initVal=0, scale=1|
+    var labelWidth=0;
+    if (label.isNil.not) { labelWidth = label.size * 9};
+    EZPopUpMenu(par,
+        bounds: paneWidth.(par, scale)@40,
+        label: label,
+        items: items,
+        globalAction: action,
+        initVal: initVal,
+        labelWidth: labelWidth
+    )
+    .setColors(
+        menuStringColor:Color.white,
+        menuBackground: colorBg,
+        background: transparent,
+    )
+    .font_(fontHead)
+};
 
 // Plates and decks.
 // Plate is always a pair of decks: 0 is Left, 1 is Right.
@@ -178,31 +199,32 @@ paneR = compViewFlow.(win, 0.648, 0.95, colorPane);
 paneStatus = compViewFlow.(win, 0.998, 0.047, colorPane);
 
 // GUI: synth ctrl section.
-makeCtlStripe = { |place|
-    var currCtrlElt, currSynthKey;
-    var parent, pn;
+makeCtlStripe = { |place, deck|
+    var pn;
+    var parent = compViewFlow.(place, 0.498, 0.9);
 
-    parent = compViewFlow.(place, 0.498, 0.9);
+    // Synth selector.
+    dropdown.(parent,
+        items: synthParams.values.collect(_.at(\name)),
+        initVal: deck,
+        action: { |dd| dd.postln },
+    );
 
-    StaticText(parent, (((parent.bounds.width).asInteger)-margin)@40)
-    .string_("synth name")
-    .stringColor_(Color.white)
-    .font_(fontHead)
-    .align_(\center);
-
-    // 2 stripes of knobs.
+    // Stripes of knobs.
     2.do {
         pn = compViewFlow.(parent, 0.498, 0.49);
         3.do { |j|
-            currCtrlElt = knob.(
-                pn,
-                " test ",
-                \freq.asSpec,
-                { |ez| ctlBus[currCtrl].value = ez.value },
-                bounds:knobWidth@knobHeight
+            // The same number of elements as in midiMapCC
+            ctrlsList.put(
+                currCtrl,
+                knob.(
+                    pn,
+                    " test ",
+                    \freq.asSpec,
+                    { |ez| ctlBus[currCtrl].value = ez.value },
+                    bounds:knobWidth@knobHeight
+                );
             );
-            // The same number of elements as in midiMapCC.
-            ctrlsList.put(currCtrl, currCtrlElt);
 
             // The same idea, but indexing ctrl buses.
             currCtrl = currCtrl + 1;
@@ -213,22 +235,33 @@ makeCtlStripe = { |place|
     compViewFlow.(parent, 0.3, 0.05);
     pn = compViewFlow.(parent, 0.69, 0.05);
 
+    // TODO: Proper labels:
+    //       Left deck:
+    //       - if current deck == 0: disabled
+    //       - otherwise enabled and label "< PLATE"
+    //       Right deck:
+    //       - if current deck == maxDecks: disabled
+    //       - if current deck is the last created, label "PLATE +"
+    //       - if current deck is not the last created, label "PLATE >"
     button.(pn, "< PLATE", { |bt| bt.value.postln }, 0.5, 0.9);
 
     // 2 sliders.
     2.do { |j|
         compViewFlow.(parent, 0.15, 0.3); // panel before
         pn = compViewFlow.(parent, 0.208, 0.3);
-        currCtrlElt = slider.(
-            pn,
-            " Vol  ",
-            \db.asSpec.step_(0.01),
-            { |ez| ctlBus[currCtrl].value = ez.value },
-            layout: \vert
+        // the same number of elements as in midiMapCC
+        ctrlsList.put(
+            currCtrl,
+            slider.(
+                pn,
+                " Vol  ",
+                \db.asSpec.step_(0.01),
+                { |ez| ctlBus[currCtrl].value = ez.value },
+                layout: \vert
+            )
         );
         compViewFlow.(parent, 0.15, 0.3); // panel after
 
-        ctrlsList.put(currCtrl, currCtrlElt); // the same number of elements as in midiMapCC
         currCtrl = currCtrl+1; // the same idea, but indexing ctrl buses
     };
 
@@ -277,37 +310,65 @@ makeTranspStripe = { |parent|
     );
 };
 
-makeCtlStripe.value(paneL);
-makeCtlStripe.value(paneL);
+makeCtlStripe.value(paneL, 0);
+makeCtlStripe.value(paneL, 1);
 makeTranspStripe.value(paneL);
 
 win.fullScreen;
 win.front;
 
 
-// MIDI: X-Session Pro
-ccResp_xSessionPro = CCResponder({ |src, chan, num, val|
+// MIDI.
+makeMIDI = {
+    "> Initializing MIDI sources...".postln;
+    if(MIDIClient.initialized.not) {
+        MIDIClient.init;
+    } {
+        MIDIClient.list;
+    };
+    MIDIIn.connectAll;
+};
+
+// MIDI control messages.
+MIDIdef.cc(\controller, { |val, num|
     var midiMapCCIndex = -1, errCode=0;
-    //	[src,chan,num,val].postln;
+    [val, num].postln;
     try { midiMapCCIndex = midiMapCC.indexOf(num) }{ errCode = 1 };
     if(errCode.booleanValue.not, {
         [num, midiMapCCIndex].postln;
         { ctrlsList[midiMapCCIndex].valueAction_(val.linlin(0, 127, 0, 1)) }.defer;
     });
-},
-xSessionPro, nil, nil, nil // X-Session Pro
-);
-nOnResp_xSessionPro = NoteOnResponder({|src, chan, num, val|
-    midiNoteOnMap.at(num).at(\gui).action.();
-}
-);
+});
 
-win.onClose = {
-    // what should be done when the window is closed.
-    ccResp_xSessionPro.remove;
-    nOnResp_xSessionPro.remove;
+// MIDI Note On messages.
+MIDIdef.noteOn(\controller, { |val, num|
+    midiNoteOnMap.at(num).at(\gui).action.();
+});
+
+// Initialize MIDI.
+makeMIDI.();
+
+
+//
+cleanup = {
+    "> Cleaning up...".postln;
+    "> Resetting bus counter...".postln;
+    s.newBusAllocators;
+
+    "> Freeing MIDI...".postln;
+    MIDIdef.freeAll;
+
+    "> Removing all functions...".postln;
+    ServerBoot.removeAll;
+    ServerTree.removeAll;
+    ServerQuit.removeAll;
 };
 
+
+// What should be done when the window is closed.
+win.onClose = {
+    cleanup.()
+};
 
 CmdPeriod.doOnce({
     win.close;
