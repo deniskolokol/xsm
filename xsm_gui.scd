@@ -1,5 +1,49 @@
 (
+// WARNING:
+// All SynthDefs must have the following args (not included into `SynthParams`):
+// - out=0 out bus
+// - fx=0 ctrl bus
+// - fxsend=(-25) db
+// - pan
+// - amp
+//
+// TODO:
+//
+// Logic behind synthParams:
+// - The first 6 params are knobs on a panel of XSession
+// - There can be more than 6 parameters, but starting from 7th
+//   they are ignored in the main 6-knobs panel
+// - Sliders panel contain \amp and \pan, unless filled with param defs
+//   (i.e. if a synth dictionary's key \sliders is empty or absent,
+//   use them for amp and pan)
 var synthParams = ( // synths dictionary
+    fm: (
+        name: "FM",
+        def: \nv_fm,
+		knobs: (
+			freq: (
+                spec: [20, 2000, \exp, 0.1, 500, units: " Hz"],
+                label: "FREQ"
+            ),
+			car: (
+                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
+                label: "CAR RATIO"
+            ),
+			mod: (
+                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
+                label: "MOD RATIO"
+            ),
+			index: (
+                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
+                label: "index"
+            ),
+            \iScale: (
+                spec: [1, 10, \lin, 0.1, 5, units: ""],
+                label: "IDX SCALE"
+            )
+        ),
+        presets: [ ]
+    ),
 	cmb: (
 		name: "CMB",
 		def: \nv_cmb,
@@ -134,6 +178,10 @@ var slider = { |par, label, spec, action, initVal, layout='horz', scaleW=1, scal
     bounds = (paneWidth.(par, scaleW))@(paneHeight.(par, scaleH));
     if (layout == 'horz') { numberWidth = 30 } { numberWidth = 45 };
     if (initVal.isNil) { initVal = spec.default };
+    postf(
+        "bounds: %\nlayout: %\nlabelWidth: %\nnumberWidth: %\nmargin: %\n---\n",
+        bounds, layout, labelWidth, numberWidth, margin
+    );
     EZSlider(
         par, bounds, label, spec,
         { |ez| action.(ez.value) },
