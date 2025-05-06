@@ -1,77 +1,8 @@
 (
-// WARNING:
-// All SynthDefs must have the following args (not included into `SynthParams`):
-// - out=0 out bus
-// - fx=0 ctrl bus
-// - fxsend=(-25) db
-// - pan
-// - amp
-//
-// TODO:
-//
-// Logic behind synthParams:
-// - The first 6 params are knobs on a panel of XSession
-// - There can be more than 6 parameters, but starting from 7th
-//   they are ignored in the main 6-knobs panel
-// - Sliders panel contain \amp and \pan, unless filled with param defs
-//   (i.e. if a synth dictionary's key \sliders is empty or absent,
-//   use them for amp and pan)
-var synthParams = ( // synths dictionary
-    fm: (
-        name: "FM",
-        def: \nv_fm,
-		knobs: (
-			freq: (
-                spec: [20, 2000, \exp, 0.1, 500, units: " Hz"],
-                label: "FREQ"
-            ),
-			car: (
-                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
-                label: "CAR RATIO"
-            ),
-			mod: (
-                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
-                label: "MOD RATIO"
-            ),
-			index: (
-                spec: [0.1, 10, \lin, 0.1, 1, units: ""],
-                label: "index"
-            ),
-            \iScale: (
-                spec: [1, 10, \lin, 0.1, 5, units: ""],
-                label: "IDX SCALE"
-            )
-        ),
-        presets: [ ]
-    ),
-	cmb: (
-		name: "CMB",
-		def: \nv_cmb,
-		sliders: (
-			rate: #[0.2, 20, \lin, 0, 2].asSpec,
-			amp: \amp.asSpec
-			),
-        presets: [ ]
-		),
-	probe: (
-		name: "Probe",
-		def: \nv_probe,
-		knobs: (
-			rate: \unipolar.asSpec,
-			delayl: [0.0001, 0.05, \lin, 0, 0.3, units: " secs"].asSpec,
-			delayr: [0.0001, 0.05, \lin, 0, 0.3, units: " secs"].asSpec,
-			pan: \pan.asSpec
-			),
-		sliders: (
-			amp: \amp.asSpec,
-			fbase: \midfreq.asSpec
-			),
-        presets: [ ]
-		)
-	);
+var currentDir = PathName(thisProcess.nowExecutingPath).pathOnly;
 
 // MIDI/Controls containers.
-var makeMIDI;
+var makeMIDI, midiFunc=List.new;
 var midiMapCC=#[ // for XSession - continous control
     24, 25, 26, 12, // Knobs 1, 2, 3 Left
     27, 28, 29, 11, // Knobs Hi, Mid, Low Left
@@ -178,10 +109,6 @@ var slider = { |par, label, spec, action, initVal, layout='horz', scaleW=1, scal
     bounds = (paneWidth.(par, scaleW))@(paneHeight.(par, scaleH));
     if (layout == 'horz') { numberWidth = 30 } { numberWidth = 45 };
     if (initVal.isNil) { initVal = spec.default };
-    postf(
-        "bounds: %\nlayout: %\nlabelWidth: %\nnumberWidth: %\nmargin: %\n---\n",
-        bounds, layout, labelWidth, numberWidth, margin
-    );
     EZSlider(
         par, bounds, label, spec,
         { |ez| action.(ez.value) },
@@ -233,6 +160,21 @@ var dropdown = { |par, label, items, action, initVal=0, scale=1|
     .font_(fontHead)
 };
 
+
+"Loading synth definitions...".postln;
+if (this.executeFile(currentDir +/+ "synthdef.scd").isNil.not) {
+    postf("OK\n\n")
+} {
+    postf("\nWARNING: could not load SynthDef(s)!\n\n")
+};
+
+"Loading synth params...".postln;
+if (this.executeFile(currentDir +/+ "synth_params.scd").isNil.not) {
+    postf("OK\n\n")
+} {
+    postf("\nWARNING: could not load Synth Params!\n\n")
+};
+
 // Plates and decks.
 // Plate is always a pair of decks: 0 is Left, 1 is Right.
 // -- bookmark --
@@ -253,7 +195,7 @@ makeCtlStripe = { |place, deck|
 
     // Synth selector.
     dropdown.(parent,
-        items: synthParams.values.collect(_.at(\name)),
+        items: ~synthParams.values.collect(_.at(\name)),
         initVal: deck,
         action: { |dd| dd.postln },
     );
@@ -366,6 +308,12 @@ win.fullScreen;
 win.front;
 
 
+// Wait for Server to boot
+Server.default.waitForBoot {
+
+};
+
+
 // MIDI.
 makeMIDI = {
     "> Initializing MIDI sources...".postln;
@@ -377,25 +325,43 @@ makeMIDI = {
     MIDIIn.connectAll;
 };
 
-// MIDI control messages.
-MIDIdef.cc(\controller, { |val, num|
-    var midiMapCCIndex = -1, errCode=0;
-    [val, num].postln;
-    try { midiMapCCIndex = midiMapCC.indexOf(num) }{ errCode = 1 };
-    if(errCode.booleanValue.not, {
-        [num, midiMapCCIndex].postln;
-        { ctrlsList[midiMapCCIndex].valueAction_(val.linlin(0, 127, 0, 1)) }.defer;
-    });
-});
+midiFunc.add(
+    // MIDI control messages.
+    MIDIFunc.cc({
+        arg ...args;
+        (["CC"] ++ args).postln;
+        // |val, num|
+        // var midiMapCCIndex = -1, errCode=0;
+        // [val, num].postln;
+        // try { midiMapCCIndex = midiMapCC.indexOf(num) }{ errCode = 1 };
+        // if(errCode.booleanValue.not, {
+        //     [num, midiMapCCIndex].postln;
+        //     { ctrlsList[midiMapCCIndex].valueAction_(val.linlin(0, 127, 0, 1)) }.defer;
+        // });
+    })
+);
 
-// MIDI Note On messages.
-MIDIdef.noteOn(\controller, { |val, num|
-    midiNoteOnMap.at(num).at(\gui).action.();
-});
+midiFunc.add(
+    // MIDI Note On messages.
+    MIDIFunc.noteOn({
+        |val, num|
+        midiNoteOnMap.at(num).at(\gui).valueAction.(1);
+    })
+);
+
+midiFunc.add(
+    // MIDI Note On messages.
+    MIDIFunc.noteOff({
+        arg ...args;
+        (["note OFF"] ++ args).postln;
+        // |val, num|
+        // ["note OFF", val, num].postln;
+        // midiNoteOnMap.at(num).at(\gui).action.(0);
+    })
+);
 
 // Initialize MIDI.
 makeMIDI.();
-
 
 //
 cleanup = {
@@ -404,7 +370,7 @@ cleanup = {
     s.newBusAllocators;
 
     "> Freeing MIDI...".postln;
-    MIDIdef.freeAll;
+    midiFunc.do(_.free);
 
     "> Removing all functions...".postln;
     ServerBoot.removeAll;
