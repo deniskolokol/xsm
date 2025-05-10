@@ -3,8 +3,8 @@
 SynthDef("fm", {
     arg freq=500, mRatio=1, cRatio=1,
     index=1, iScale=5, cAtk=4, cRel=(-4),
-    amp=0.2, atk=0.01, rel=3, pan=0,
-    out=0, fx=0, fxsend=(-25);
+    amp=0.2, atk=0.01, dec=0.5, sus=0.5, rel=1, gate=1,
+    pan=0, out=0, fx=0, fxsend=(-25);
 
     var car, mod, env, iEnv;
 
@@ -18,7 +18,11 @@ SynthDef("fm", {
     );
 
     //amplitude envelope
-    env = EnvGen.kr(Env.perc(atk,rel,curve:[cAtk,cRel]),doneAction:2);
+    env = EnvGen.kr(
+        Env.adsr(atk, dec, sus, rel, curve:[cAtk,cRel]),
+        gate,
+        doneAction:2
+    );
 
     //modulator/carrier
     mod = SinOsc.ar(freq * mRatio, mul:freq * mRatio * iEnv);
@@ -31,6 +35,35 @@ SynthDef("fm", {
 
     // FX send
     Out.ar(fx, car * fxsend.dbamp);
+}).add;
+
+
+
+SynthDef("moogy", {
+    arg in=30, out=0, pan=0, fx=0, fxsend=(-25),
+    freq=220, amp=0.2, cutoff=1000, gain=2.5, reset=0,
+    atk=0.1, rel=2, cAtk=(-1), cRel=2;
+
+    var signal, trig, degree, env;
+    freq = freq * { Rand(-0.1, 0.1).midiratio }.dup(4);
+
+    //amplitude envelope
+    env = EnvGen.kr(
+        Env.perc(atk, rel, amp, curve:[cAtk, cRel]),
+        doneAction:2
+    );
+
+    signal = Saw.ar(freq);
+    signal = Splay.ar(signal);
+    signal = MoogFF.ar(signal, cutoff, gain, reset);
+    signal = signal * env;
+    signal = Pan2.ar(signal, pan);
+
+    //direct out
+    Out.ar(out, signal);
+
+    // FX send
+    Out.ar(fx, signal * fxsend.dbamp);
 }).add;
 
 
