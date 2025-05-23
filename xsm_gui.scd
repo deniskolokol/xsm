@@ -40,10 +40,11 @@ var currCtrl=0;
 var plates = List.new;
 
 // Synth control.
+var deckLabel = Dictionary[0 -> 'LEFT', 1 -> 'RIGHT'];
 var changeSynth = { |deck, plate=0|
     postf(
-        "Placeholder for changing the synth on the deck %, plate %!\n",
-        deck,
+        "Placeholder for changing the synth on the % deck, plate %!\n",
+        deckLabel[deck],
         plate
     );
 };
