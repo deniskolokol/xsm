@@ -345,7 +345,7 @@ midiFunc.add(
     // MIDI Note On messages.
     MIDIFunc.noteOn({
         |val, num|
-        midiNoteOnMap.at(num).at(\gui).valueAction.(1);
+        { midiNoteOnMap.at(num)[\gui].valueAction_(val) }.defer
     })
 );
 

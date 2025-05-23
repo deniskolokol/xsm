@@ -62,8 +62,6 @@ if (this.executeFile(~currentDir +/+ "synth_params.scd").isNil.not) {
 };
 )
 
-d
-
 
 // TODO:
 deckLeft = ~deckFactory.(\fm, out:0) // should load presets along
