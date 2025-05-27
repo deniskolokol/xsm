@@ -36,6 +36,9 @@ var ctrlsList=Array.fill(midiMapCC.size, {nil});
 var ctlBus=Array.fill(midiMapCC.size, {Bus.control(s)});
 var currCtrl=0;
 
+// The list of control GUI elements in a detailed view (Arturia)
+var ctrlsListSynth=List.new;
+
 // Plates and decks.
 var plates = List.new;
 
@@ -62,6 +65,12 @@ var pane, paneL, paneR, paneStatus;
 var paneLctrlKnob, paneRctrlKnob, paneLctrlSlid, paneRctrlSlid, paneLctrlBt, paneRctrlBt;
 var knobWidth=115, knobHeight=115;
 var makeCtlStripe, makeTranspStripe;
+
+// Arturia GUI
+var arturiaKnobs; // type: CompositeView
+var arturiaKnobSize = 100;
+var arturiaMasterKnob; // type: EZKnob
+var ctrlEnv, arturiaEnvCtrls;
 
 var colorBg=Color.grey(0.15);
 var colorPane=Color.grey(0.1);
@@ -162,18 +171,21 @@ var dropdown = { |par, label, items, action, initVal=0, scale=1|
 };
 
 
-"Loading synth definitions...".postln;
-if (this.executeFile(currentDir +/+ "synthdef.scd").isNil.not) {
-    postf("OK\n\n")
-} {
-    postf("\nWARNING: could not load SynthDef(s)!\n\n")
-};
+// Wait for Server to boot
+Server.default.waitForBoot {
+    "Loading synth definitions...".postln;
+    if (this.executeFile(currentDir +/+ "synthdef.scd").isNil.not) {
+        postf("OK\n\n")
+    } {
+        postf("\nWARNING: could not load SynthDef(s)!\n\n")
+    };
 
-"Loading synth params...".postln;
-if (this.executeFile(currentDir +/+ "synth_params.scd").isNil.not) {
-    postf("OK\n\n")
-} {
-    postf("\nWARNING: could not load Synth Params!\n\n")
+    "Loading synth params...".postln;
+    if (this.executeFile(currentDir +/+ "synth_params.scd").isNil.not) {
+        postf("OK\n\n")
+    } {
+        postf("\nWARNING: could not load Synth Params!\n\n")
+    };
 };
 
 // Plates and decks.
@@ -189,6 +201,8 @@ paneL = compViewFlow.(win, 0.35, 0.95, colorPane);
 paneR = compViewFlow.(win, 0.648, 0.95, colorPane);
 paneStatus = compViewFlow.(win, 0.998, 0.047, colorPane);
 
+
+// ---------- LEFT DECK ----------
 // GUI: synth ctrl section.
 makeCtlStripe = { |place, deck|
     var pn;
@@ -301,18 +315,70 @@ makeTranspStripe = { |parent|
     );
 };
 
-makeCtlStripe.value(paneL, 0);
-makeCtlStripe.value(paneL, 1);
-makeTranspStripe.value(paneL);
+makeCtlStripe.(paneL, 0);
+makeCtlStripe.(paneL, 1);
+makeTranspStripe.(paneL);
+
+
+// ---------- RIGHT DECK ----------
+arturiaMasterKnob = { |parent|
+    var pn = compViewFlow.(parent, 0.12, 0.28, color:colorBg, margin:10, gap:5);
+
+    StaticText(pn, (pn.bounds.width-20)@(pn.bounds.height/2.3))
+    .align_(\center)
+    .font_(fontHead)
+    .stringColor_(Color.white)
+    .string_("Ch 1");
+
+    knob.(
+        pn,
+        " test ",
+        \freq.asSpec,
+        { |ez| ez.value.postln },
+        bounds:arturiaKnobSize@arturiaKnobSize
+    )
+    .setColors(knobColors:[Color.white, Color.grey, Color.white, Color.black]);
+};
+
+arturiaKnobs = { |parent|
+    var pn = compViewFlow.(parent, 0.43, 0.28, color:colorBg, margin:10, gap:5);
+    var knobSize = 100;
+    var kn, knList = List.new;
+    8.do {
+        kn = knob.(
+            pn,
+            " test ",
+            \freq.asSpec,
+            { |ez| ez.value.postln },
+            bounds:knobSize@knobSize
+        );
+
+        // change standard colors
+        kn.setColors(knobColors:[Color.white, Color.grey, Color.white, Color.black]);
+        knList.add(kn)
+    };
+
+    // return list of GUI elements
+    knList
+};
+
+arturiaEnvCtrls = { |parent|
+    var pn = compViewFlow.(parent, 0.45, 0.28, color:colorBg, margin:10, gap:5);
+    var envPlot = Plotter("plot", Rect(0, 0, pn.bounds.width-20, pn.bounds.height-20), parent:pn);
+    envPlot.value = Env.adsr.asSignal(512);
+
+    // return Plotter
+    envPlot
+};
+
+
+arturiaMasterKnob.(paneR);
+ctrlsListSynth = arturiaKnobs.(paneR);
+ctrlEnv = arturiaEnvCtrls.(paneR);
+
 
 win.fullScreen;
 win.front;
-
-
-// Wait for Server to boot
-Server.default.waitForBoot {
-
-};
 
 
 // MIDI.
@@ -361,8 +427,8 @@ midiFunc.add(
     })
 );
 
-// Initialize MIDI.
-makeMIDI.();
+// // Initialize MIDI.
+// makeMIDI.();
 
 //
 cleanup = {
