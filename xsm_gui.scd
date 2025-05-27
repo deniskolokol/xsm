@@ -9,7 +9,7 @@ var midiMapCC=#[ // for XSession - continous control
     34, 35, 36, 14, // Knobs 1, 2, 3 Right
     31, 32, 33, 15, // Knobs Hi, Mid, Low Right
     17, // Crossfader (normal)
-	];
+];
 var midiMapNO=#[ // for XSession - note on
     44, // Headphone Button Left
     46, 43, // << & >> Buttons Left
@@ -19,7 +19,7 @@ var midiMapNO=#[ // for XSession - note on
     56, 57, // << & >> Buttons Right
     69, // Play Button Right
     59, // Cue Button Right
-	];
+];
 var midiNoteOnMap = Dictionary[ // for XSession - note on
     44 -> Dictionary[\descr -> "Headphone Button Left"],
     46 -> Dictionary[\descr -> "<< Button Left"],
@@ -71,11 +71,11 @@ var arturiaKnobs; // type: CompositeView
 var arturiaKnobSize = 100;
 var arturiaMasterKnob; // type: EZKnob
 var ctrlEnv, arturiaEnvCtrls;
+var presetListSynths, arturiaButtons;
 
 var colorBg=Color.grey(0.15);
 var colorPane=Color.grey(0.1);
-var colorBtLabel=Color.grey(0.2), colorBtUp=Color.grey(0.6),
-    colorBtDown=Color.blue;
+var colorBtLabel=Color.grey(0.2), colorBtUp=Color.grey(0.6), colorBtDown=Color.blue;
 var colorInProgress=Color.red;
 var transparent=Color.grey(alpha:0.0);
 
@@ -365,16 +365,31 @@ arturiaKnobs = { |parent|
 arturiaEnvCtrls = { |parent|
     var pn = compViewFlow.(parent, 0.45, 0.28, color:colorBg, margin:10, gap:5);
     var envPlot = Plotter("plot", Rect(0, 0, pn.bounds.width-20, pn.bounds.height-20), parent:pn);
-    envPlot.value = Env.adsr.asSignal(512);
+    envPlot.value = Env.adsr(0.5, 1, 0.5, 1, curve:[0.5, -4, -3]).asSignal(512);
+    envPlot.setProperties(
+        \fontColor, Color(0.5, 1, 0),
+        \plotColor, Color.red,
+        \backgroundColor, colorBg,
+        \gridColorX, Color.yellow(0.5),
+        \gridColorY, Color.yellow(0.5),
+        \labelX, "ADSR",
+        \labelFontColor, Color.white
+    );
+    envPlot.refresh;
+};
 
-    // return Plotter
-    envPlot
+
+arturiaButtons = { |parent|
+    var pn = compViewFlow.(parent, 0.998, 0.12, color:colorBg, margin:15, gap:10);
+    10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.095, 0.8)};
 };
 
 
 arturiaMasterKnob.(paneR);
 ctrlsListSynth = arturiaKnobs.(paneR);
 ctrlEnv = arturiaEnvCtrls.(paneR);
+presetListSynths = arturiaButtons.(paneR);
+MIDI
 
 
 win.fullScreen;
