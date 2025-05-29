@@ -16,7 +16,7 @@
 //   (i.e. if a synth dictionary's key \sliders is empty or absent,
 //   use them for amp and pan)
 ~synthParams = ( // synths dictionary
-    fm: (
+    "fm__2": (
         name: "FM",
         def: \nv_fm,
 		knobs: (
@@ -47,7 +47,7 @@
         ),
         presets: [ ]
     ),
-	cmb: (
+    "cmb__2": (
 		name: "CMB",
 		def: \nv_cmb,
 		sliders: (
@@ -56,7 +56,7 @@
 			),
         presets: [ ]
 		),
-	probe: (
+    "probe__2": (
 		name: "Probe",
 		def: \nv_probe,
 		knobs: (

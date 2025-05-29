@@ -270,10 +270,10 @@ makeCtlStripe = { |place, deck|
         currCtrl = currCtrl+1; // the same idea, but indexing ctrl buses
     };
 
-    // Presets buttons.
-    pn = compViewFlow.(parent, 0.99, 0.1);
-    // TODO: toggle buttons
-    10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.1, 0.1)};
+    // // Presets buttons.
+    // pn = compViewFlow.(parent, 0.99, 0.1);
+    // // TODO: toggle buttons
+    // 10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.1, 0.1)};
 };
 
 // GUI: synth ctrl section.
@@ -321,6 +321,8 @@ makeTranspStripe.(paneL);
 
 
 // ---------- RIGHT DECK ----------
+//
+// Arturia view
 arturiaMasterKnob = { |parent|
     var pn = compViewFlow.(parent, 0.12, 0.28, color:colorBg, margin:10, gap:5);
 
@@ -389,7 +391,6 @@ arturiaMasterKnob.(paneR);
 ctrlsListSynth = arturiaKnobs.(paneR);
 ctrlEnv = arturiaEnvCtrls.(paneR);
 presetListSynths = arturiaButtons.(paneR);
-MIDI
 
 
 win.fullScreen;

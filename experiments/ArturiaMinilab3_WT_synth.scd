@@ -5,6 +5,7 @@ Server.default = s = Server.local;
 s.boot;
 
 ~rbus = Bus.audio(s, 2);
+~synthname = "fm__2"; //"osc";
 
 s.waitForBoot({
 
@@ -159,7 +160,7 @@ s.waitForBoot({
             freq = num.midicps;
 
             // Create a new synth with the current parameter values
-            synth = Synth(\osc, [
+            synth = Synth(~synthname, [
                 \freq, freq,
                 \buf, ~wt_buf[0..3].choose,
                 \detune, ~detune,

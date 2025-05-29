@@ -1,122 +1,236 @@
+//    arg:
+// inbus => in
+// outbus => out
+// atk => atk
+// sus => sus
+// rel => rel
+// momentum => momentum
+// offset => \ (shold receive a note!)
+//
+//    var:
+// in => signal (no diff between in and signal anymore)
+// out => output
+//
 (
-//fm synth
-SynthDef("fm", {
-    arg freq=500, mRatio=1, cRatio=1,
-    index=1, iScale=5, cAtk=4, cRel=(-4),
-    amp=0.2, atk=0.01, dec=0.5, sus=0.5, rel=1, gate=1,
-    pan=0, out=0, fx=0, fxsend=(-25);
+var outFuncName, outCodeFunc;
 
-    var car, mod, env, iEnv;
+// default speaker placement configurations
+var spatialConf = (
+    "2": (
+        azim: #[-0.25pi, -0.75pi],
+        elev: #[0, 0],
+        dist: #[2, 2],
+        maxDist: 2
+    ),
+    "4": (
+        azim: #[-0.25pi, -0.75pi, 0.75pi, 0.25pi],
+        elev: #[0, 0, 0, 0],
+        dist: #[2, 2, 2, 2],
+        maxDist: 2
+    ),
+    // "6": (
+    //     azim: #[-0.25pi, -0.5pi, -0.75pi, 0.75pi, 0.5pi, 0.25pi],
+    //     elev: #[0, 0, 0, 0, 0, 0],
+    //     dist: #[2, 2, 2, 2, 2, 2],
+    //     maxDist: 2
+    // ),
+    // "8": (
+    //     azim: #[-0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0],
+    //     elev: #[0, 0, 0, 0, 0, 0, 0, 0],
+    //     dist: #[2, 2, 2, 2, 2, 2, 2, 2],
+    //     maxDist: 2
+    // ),
+    // "10": (
+    //     azim: #[-0.15, -0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0.15pi, 0],
+    //     elev: #[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    //     dist: #[2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+    //     maxDist: 2
+    // ),
+);
 
-    //index of modulation
-    iEnv = EnvGen.kr(
-        Env(
-            [index, index*iScale, index],
-            [atk, rel],
-            [cAtk, cRel]
+// GENERATORS
+var makeSynthDefADSR = { |name, outCodeFunc|
+    // silent synth
+    SynthDef("silent__" ++ name, {
+        arg out=0, trigID=80,
+        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
+
+        var signal = Silent.ar();
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
+        );
+    }).add;
+
+    // audio-through
+    SynthDef("audiothrough__" ++ name, {
+        arg bufnum=0, in=0, out=0, trigID=80, amp=1,
+        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
+
+        var input = InFeedback.ar(in, 1);
+        var ds = distance/3.44;
+        var reverb = FreeVerb.ar(input, distance.clip(0.01, 1), ds, 0.2);
+        var delayed = DelayL.ar(reverb, 0.3, ds);
+        var signal = RLPF.ar(delayed, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
+        );
+    }).add;
+
+    // Moog emulation
+    SynthDef("moogff__" ++ name, {
+        // common args
+        arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0,
+        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
+
+        // synth specific args
+        cutoff=1000, gain=2.5, reset=0;
+
+        var signal, trig, degree, env;
+
+        freq = freq * { Rand(-0.1, 0.1).midiratio }.dup(4);
+
+        signal = Saw.ar(freq);
+        signal = Mix.ar(signal);
+        signal = MoogFF.ar(signal, cutoff, gain, reset);
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
         )
-    );
+    }).add;
 
-    //amplitude envelope
-    env = EnvGen.kr(
-        Env.adsr(atk, dec, sus, rel, curve:[cAtk,cRel]),
-        gate,
-        doneAction:2
-    );
+    //fm synth
+    SynthDef("fm__" ++ name, {
+        arg freq=500, amp=0.2, out=0, trigID=80,
+        atk=0.01, dec=0.5, sus=0.5, rel=1, cAtk=4, cRel=(-4),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
-    //modulator/carrier
-    mod = SinOsc.ar(freq * mRatio, mul:freq * mRatio * iEnv);
-    car = SinOsc.ar(freq * cRatio + mod) * env * amp;
+        // synth specific
+        mRatio=1, cRatio=1, index=1, iScale=5;
 
-    car = Pan2.ar(car, pan);
+        var signal, mod, env, iEnv;
 
-    //direct out
-    Out.ar(out, car);
-
-    // FX send
-    Out.ar(fx, car * fxsend.dbamp);
-}).add;
-
-
-
-SynthDef("moogy", {
-    arg in=30, out=0, pan=0, fx=0, fxsend=(-25),
-    freq=220, amp=0.2, cutoff=1000, gain=2.5, reset=0,
-    atk=0.1, rel=2, cAtk=(-1), cRel=2;
-
-    var signal, trig, degree, env;
-    freq = freq * { Rand(-0.1, 0.1).midiratio }.dup(4);
-
-    //amplitude envelope
-    env = EnvGen.kr(
-        Env.perc(atk, rel, amp, curve:[cAtk, cRel]),
-        doneAction:2
-    );
-
-    signal = Saw.ar(freq);
-    signal = Splay.ar(signal);
-    signal = MoogFF.ar(signal, cutoff, gain, reset);
-    signal = signal * env;
-    signal = Pan2.ar(signal, pan);
-
-    //direct out
-    Out.ar(out, signal);
-
-    // FX send
-    Out.ar(fx, signal * fxsend.dbamp);
-}).add;
-
-
-SynthDef("cmb", {
-    arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=1,
-    gate=1, attack=0.01, sustain=1, release=0.5, ca=3, cr=(-3),
-    fx=0, fxsend=(-25);
-
-    var raw, signal;
-    var delayL, delayR, pos=0.0, pulse, mix, n=8;
-    pulse = LFNoise0.kr(rrand(0.2,1.0), 1,1).squared * rate;
-    mix = Klank.ar(
-        `[Array.fill(n, {exprand(1.0,20.0)}),
-            nil,
-            Array.fill(n, {0.2.rand})
-        ],
-        Blip.ar(pulse, [rrand(2,5), rrand(2,5)], 0.1)
-    ).fold2(0.2).cubed * 12;
-    raw = Mix.fill(3, {CombL.ar(mix, 0.1, 0.03.linrand, 4.0.linrand)});
-    raw = raw.distort * 0.5;
-    6.do({ raw= AllpassN.ar(raw, 0.05, [0.05.rand, 0.05.rand], 3) });
-    signal = LeakDC.ar(raw * 0.5);
-
-    //direct out
-    Out.ar(out, signal);
-
-    // FX send
-    Out.ar(fx, signal * fxsend.dbamp);
-}).add;
-
-
-SynthDef("probe", {
-    arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=0.1,
-    gate=1, attack=0.01, sustain=1, release=0.5, ca=3, cr=(-3),
-    offset=36, scope=12, fx=0, fxsend=(-25);
-    var signal;
-    var raw = LPZ2.ar(
-        LFPulse.ar(
-            freq, 2pi.rand, 0.1,
-            (
-                Mix.ar(SinOsc.ar(rate * [rrand(0.7, 1.3), 1], [2pi.rand, 2pi.rand], 0.04)).max(0)
-                * Mix.ar(SinOsc.ar(exprand(6,24) * [rrand(0.7, 1.3), 1], [2pi.rand, 2pi.rand])).abs
+        //index of modulation
+        iEnv = EnvGen.kr(
+            Env(
+                [index, index*iScale, index],
+                [atk, rel],
+                [cAtk, cRel]
             )
+        );
+
+        //modulator/carrier
+        mod = SinOsc.ar(freq * mRatio, mul:freq * mRatio * iEnv);
+        signal = SinOsc.ar(freq * cRatio + mod) * amp;
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
         )
-    );
-    2.do({ raw = AllpassN.ar(raw, 0.05, [0.01, 0.05], 3.0.rand, amp) });
-    signal = Limiter.ar(MidEQ.ar(Mix(raw), 1400, 0.7, 8), 0.8);
+    }).add;
 
-    //direct out
-    Out.ar(out, signal);
 
-    // FX send
-    Out.ar(fx, signal * fxsend.dbamp);
-}).add;
+    SynthDef("cmb__" ++ name, {
+        arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=1,
+        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
+        var raw, signal;
+        var delayL, delayR, pos=0.0, pulse, mix, n=8;
+        pulse = LFNoise0.kr(rrand(0.2,1.0), 1,1).squared * rate;
+        mix = Klank.ar(
+            `[Array.fill(n, {exprand(1.0,20.0)}),
+                nil,
+                Array.fill(n, {0.2.rand})
+            ],
+            Blip.ar(pulse, [rrand(2,5), rrand(2,5)], 0.1)
+        ).fold2(0.2).cubed * 12;
+        raw = Mix.fill(3, {CombL.ar(mix, 0.1, 0.03.linrand, 4.0.linrand)});
+        raw = raw.distort * 0.5;
+        6.do({ raw= AllpassN.ar(raw, 0.05, [0.05.rand, 0.05.rand], 3) });
+        signal = LeakDC.ar(raw * 0.5);
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
+        )
+    }).add;
+
+
+    SynthDef("probe__" ++ name, {
+        arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=0.1,
+        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
+
+        // synth specific
+        offset=36, scope=12;
+
+        var signal;
+        var raw = LPZ2.ar(
+            LFPulse.ar(
+                freq, 2pi.rand, 0.1,
+                (
+                    Mix.ar(SinOsc.ar(rate * [rrand(0.7, 1.3), 1], [2pi.rand, 2pi.rand], 0.04)).max(0)
+                    * Mix.ar(SinOsc.ar(exprand(6,24) * [rrand(0.7, 1.3), 1], [2pi.rand, 2pi.rand])).abs
+                )
+            )
+        );
+        2.do({ raw = AllpassN.ar(raw, 0.05, [0.01, 0.05], 3.0.rand, amp) });
+        signal = Limiter.ar(MidEQ.ar(Mix(raw), 1400, 0.7, 8), 0.8);
+
+        outCodeFunc.value(
+            signal, out, trigID, azimuth, distance, elevation,
+            atk, sus, rel, cAtk, cRel, depth, elevClip
+        )
+    }).add;
+
+};
+
+spatialConf.keysValuesDo { |name, conf|
+    // call SynthDef creation
+    // `name` - name of spatial configuration
+    // function - functionality of spatial configuration
+
+    // synths based on ADSR
+    makeSynthDefADSR.(name, {
+        arg signal, out=0, trigID=80,
+        azimuth= -0.5pi, distance=0.1, elevation=0,
+        atk=0.01, decay=0.3, sus=0.8, rel=0.5, cAtk=3, cRel=(-3),
+        depth=5, elevClip=0.01pi;
+
+        var dist=distance.linlin(0, 2.sqrt, 0.01, depth);
+        var elev=elevation.linlin(-0.5pi, 0.5pi, elevClip.neg, elevClip);
+        var mix=distance.linexp(0, 2.sqrt, 0.1, 0.8);
+        var room=distance.linexp(0, 2.sqrt, 0.2, 1);
+        var w, x, y, z, r, s, t, u, v;
+
+        // envelope, reverb, filter
+        var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
+        var reverb = FreeVerb.ar(Mix.ar(signal), mix, room, 0.2);
+        var filtered = RLPF.ar(reverb, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
+        var output = filtered * env;
+
+        // report (single channel after effects before spatialisation)
+        SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(output));
+
+        // spatialisation
+        #w, x, y, z, r, s, t, u, v = FMHEncode1.ar(output, azimuth, elev, dist);
+
+        Out.ar(out,
+            FMHDecode1.ar1(w, x, y, z, r, s, t, u, v,
+                azimuth: \azim.kr(conf.azim),
+                elevation: \elev.kr(conf.elev),
+                distance: \dist.kr(conf.dist),
+                maxDist: \maxDist.kr(conf.maxDist),
+            )
+        );
+    });
+};
 )
