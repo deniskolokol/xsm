@@ -53,21 +53,21 @@ var makeSynthDefADSR = { |name, outCodeFunc|
     // silent synth
     SynthDef("silent__" ++ name, {
         arg out=0, trigID=80,
-        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
         var signal = Silent.ar();
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         );
     }).add;
 
     // audio-through
     SynthDef("audiothrough__" ++ name, {
         arg bufnum=0, in=0, out=0, trigID=80, amp=1,
-        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
         var input = InFeedback.ar(in, 1);
@@ -78,7 +78,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         );
     }).add;
 
@@ -86,7 +86,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
     SynthDef("moogff__" ++ name, {
         // common args
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0,
-        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
         // synth specific args
@@ -102,7 +102,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         )
     }).add;
 
@@ -132,14 +132,14 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         )
     }).add;
 
 
     SynthDef("cmb__" ++ name, {
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=1,
-        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
         var raw, signal;
@@ -159,14 +159,14 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         )
     }).add;
 
 
     SynthDef("probe__" ++ name, {
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=0.1,
-        atk=0.01, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+        atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
         // synth specific
@@ -187,7 +187,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         outCodeFunc.value(
             signal, out, trigID, azimuth, distance, elevation,
-            atk, sus, rel, cAtk, cRel, depth, elevClip
+            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
         )
     }).add;
 
@@ -205,10 +205,10 @@ spatialConf.keysValuesDo { |name, conf|
         atk=0.01, decay=0.3, sus=0.8, rel=0.5, cAtk=3, cRel=(-3),
         depth=5, elevClip=0.01pi;
 
-        var dist=distance.linlin(0, 2.sqrt, 0.01, depth);
         var elev=elevation.linlin(-0.5pi, 0.5pi, elevClip.neg, elevClip);
-        var mix=distance.linexp(0, 2.sqrt, 0.1, 0.8);
-        var room=distance.linexp(0, 2.sqrt, 0.2, 1);
+        var mix=distance.linexp(0, 2.sqrt, 0.001, 1.0);
+        var room=distance.linexp(0, 2.sqrt, 0.001, 1.0);
+        var dist=distance.linlin(0, 2.sqrt, 0, depth);
         var w, x, y, z, r, s, t, u, v;
 
         // envelope, reverb, filter
