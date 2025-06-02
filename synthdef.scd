@@ -1,72 +1,26 @@
-//    arg:
-// inbus => in
-// outbus => out
-// atk => atk
-// sus => sus
-// rel => rel
-// momentum => momentum
-// offset => \ (shold receive a note!)
-//
-//    var:
-// in => signal (no diff between in and signal anymore)
-// out => output
-//
 (
-var outFuncName, outCodeFunc;
-
-// default speaker placement configurations
-var spatialConf = (
-    "2": (
-        azim: #[-0.25pi, -0.75pi],
-        elev: #[0, 0],
-        dist: #[2, 2],
-        maxDist: 2
-    ),
-    "4": (
-        azim: #[-0.25pi, -0.75pi, 0.75pi, 0.25pi],
-        elev: #[0, 0, 0, 0],
-        dist: #[2, 2, 2, 2],
-        maxDist: 2
-    ),
-    // "6": (
-    //     azim: #[-0.25pi, -0.5pi, -0.75pi, 0.75pi, 0.5pi, 0.25pi],
-    //     elev: #[0, 0, 0, 0, 0, 0],
-    //     dist: #[2, 2, 2, 2, 2, 2],
-    //     maxDist: 2
-    // ),
-    // "8": (
-    //     azim: #[-0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0],
-    //     elev: #[0, 0, 0, 0, 0, 0, 0, 0],
-    //     dist: #[2, 2, 2, 2, 2, 2, 2, 2],
-    //     maxDist: 2
-    // ),
-    // "10": (
-    //     azim: #[-0.15, -0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0.15pi, 0],
-    //     elev: #[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    //     dist: #[2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-    //     maxDist: 2
-    // ),
-);
-
 // GENERATORS
 var makeSynthDefADSR = { |name, outCodeFunc|
     // silent synth
     SynthDef("silent__" ++ name, {
-        arg out=0, trigID=80,
+        arg amp=0, out=0, trigID=80,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
         var signal = Silent.ar();
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
         );
     }).add;
 
     // audio-through
     SynthDef("audiothrough__" ++ name, {
         arg bufnum=0, in=0, out=0, trigID=80, amp=1,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
@@ -76,9 +30,10 @@ var makeSynthDefADSR = { |name, outCodeFunc|
         var delayed = DelayL.ar(reverb, 0.3, ds);
         var signal = RLPF.ar(delayed, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
         );
     }).add;
 
@@ -86,6 +41,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
     SynthDef("moogff__" ++ name, {
         // common args
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
@@ -100,15 +56,17 @@ var makeSynthDefADSR = { |name, outCodeFunc|
         signal = Mix.ar(signal);
         signal = MoogFF.ar(signal, cutoff, gain, reset);
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
-        )
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
+        );
     }).add;
 
     //fm synth
     SynthDef("fm__" ++ name, {
         arg freq=500, amp=0.2, out=0, trigID=80,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=0.5, rel=1, cAtk=4, cRel=(-4),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
@@ -128,17 +86,19 @@ var makeSynthDefADSR = { |name, outCodeFunc|
 
         //modulator/carrier
         mod = SinOsc.ar(freq * mRatio, mul:freq * mRatio * iEnv);
-        signal = SinOsc.ar(freq * cRatio + mod) * amp;
+        signal = SinOsc.ar(freq * cRatio + mod);
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
-        )
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
+        );
     }).add;
 
 
     SynthDef("cmb__" ++ name, {
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=1,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
@@ -157,15 +117,17 @@ var makeSynthDefADSR = { |name, outCodeFunc|
         6.do({ raw= AllpassN.ar(raw, 0.05, [0.05.rand, 0.05.rand], 3) });
         signal = LeakDC.ar(raw * 0.5);
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
-        )
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
+        );
     }).add;
 
 
     SynthDef("probe__" ++ name, {
         arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0, rate=0.1,
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
         atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
         azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi,
 
@@ -182,28 +144,106 @@ var makeSynthDefADSR = { |name, outCodeFunc|
                 )
             )
         );
-        2.do({ raw = AllpassN.ar(raw, 0.05, [0.01, 0.05], 3.0.rand, amp) });
+        2.do({ raw = AllpassN.ar(raw, 0.05, [0.01, 0.05], 3.0.rand) });
         signal = Limiter.ar(MidEQ.ar(Mix(raw), 1400, 0.7, 8), 0.8);
 
-        outCodeFunc.value(
-            signal, out, trigID, azimuth, distance, elevation,
-            atk, dec, sus, rel, cAtk, cRel, depth, elevClip
-        )
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
+        );
     }).add;
-
 };
 
+// default speaker placement configurations
+// naming synths: "a<N>" ("a" for "ambisonic", <N> - num of channels)
+var spatialConf = (
+    "a2": (
+        azim: #[-0.25pi, -0.75pi],
+        elev: #[0, 0],
+        dist: #[2, 2],
+        maxDist: 2
+    ),
+    "a4": (
+        azim: #[-0.25pi, -0.75pi, 0.75pi, 0.25pi],
+        elev: #[0, 0, 0, 0],
+        dist: #[2, 2, 2, 2],
+        maxDist: 2
+    ),
+    "a6": (
+        azim: #[-0.25pi, -0.5pi, -0.75pi, 0.75pi, 0.5pi, 0.25pi],
+        elev: #[0, 0, 0, 0, 0, 0],
+        dist: #[2, 2, 2, 2, 2, 2],
+        maxDist: 2
+    ),
+    "a8": (
+        azim: #[-0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0],
+        elev: #[0, 0, 0, 0, 0, 0, 0, 0],
+        dist: #[2, 2, 2, 2, 2, 2, 2, 2],
+        maxDist: 2
+    ),
+    "a10": (
+        azim: #[-0.15, -0.25pi, -0.5pi, -0.75pi, 1pi, 0.75pi, 0.5pi, 0.25pi, 0.15pi, 0],
+        elev: #[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        dist: #[2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+        maxDist: 2
+    ),
+);
+
+
+// add synths for stereo output
+// name "s2": "s" for "stereo", 2 - num of channels
+makeSynthDefADSR.("s2", {
+    // Function for simple stereo output.
+    arg signal, amp=1, out=0, trigID=80,
+    // pan params, etc.
+    azimuth=0, // converted to `center` in Splay (-1..1)
+    distance=0.1, // converted to FreeVerb's `room` (0..1)
+    elevation=0, // - unused -
+    elevClip=0.01pi, // - unused -
+    depth=0.3, // => converted to Splay `spread` (0..1)
+    // filter params
+    filtFreq=440, // filter frequency, Hz (20..4000)
+    filtParam=1.0, // filter RQ (for RL(H)PF), BWR (for Rezonz), decaytime (for Ringz) - CONVERT BEFORE SENDING!
+    filtType=0, // 0 - RHPF, 1 - RLPF, 2 - Rezonz, 3 - Ringz
+    revDamp=0.5, // FreeVerb `damp` (0..1)
+    revMix=0.25, // FreeVerb `mix`, i.e. dry/wet balance (0..1)
+    // env params
+    atk=0.01, decay=0.3, sus=0.8, rel=0.5, cAtk=3, cRel=(-3);
+
+    var room = distance.linexp(0, 2.sqrt, 0.001, 1.0);
+
+    // envelope, reverb, filter
+    var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
+    var reverb = FreeVerb.ar(Mix.ar(signal), revMix, room, revDamp);
+    var filtered = RLPF.ar(reverb, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
+    var output = filtered * env * amp;
+
+    // report (single channel after effects before Splay)
+    SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(output));
+
+    Out.ar(out, Splay.ar(output, spread:depth, center:azimuth))
+});
+
+
+// Warning: at the moment all synths are being created.
+// TODO: make the choice between stereo and ambisonics depending on the configuration
 spatialConf.keysValuesDo { |name, conf|
     // call SynthDef creation
     // `name` - name of spatial configuration
     // function - functionality of spatial configuration
 
     // synths based on ADSR
+    // WARNING! Make this coice before adding SynthDefs
     makeSynthDefADSR.(name, {
-        arg signal, out=0, trigID=80,
-        azimuth= -0.5pi, distance=0.1, elevation=0,
-        atk=0.01, decay=0.3, sus=0.8, rel=0.5, cAtk=3, cRel=(-3),
-        depth=5, elevClip=0.01pi;
+        // Function for output second order ambisonic signal.
+        arg signal, amp=1, out=0, trigID=80,
+        // spatial params
+        azimuth= -0.5pi, distance=0.1, elevation=0, elevClip=0.01pi, depth=5,
+        // - unused -
+        filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
+        // env params
+        atk=0.01, decay=0.3, sus=0.8, rel=0.5, cAtk=3, cRel=(-3);
 
         var elev=elevation.linlin(-0.5pi, 0.5pi, elevClip.neg, elevClip);
         var mix=distance.linexp(0, 2.sqrt, 0.001, 1.0);
@@ -215,7 +255,7 @@ spatialConf.keysValuesDo { |name, conf|
         var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
         var reverb = FreeVerb.ar(Mix.ar(signal), mix, room, 0.2);
         var filtered = RLPF.ar(reverb, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
-        var output = filtered * env;
+        var output = filtered * env * amp;
 
         // report (single channel after effects before spatialisation)
         SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(output));

@@ -5,7 +5,7 @@ Server.default = s = Server.local;
 s.boot;
 
 ~rbus = Bus.audio(s, 2);
-~synthname = "fm__2"; //"osc";
+~synthname = "osc";
 
 s.waitForBoot({
 
