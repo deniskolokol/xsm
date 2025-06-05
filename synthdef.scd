@@ -213,16 +213,38 @@ makeSynthDefADSR.("s2", {
 
     var room = distance.linexp(0, 2.sqrt, 0.001, 1.0);
 
+    // input signal
+    var sig = Mix.ar(signal);
+
     // envelope, reverb, filter
     var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
-    var reverb = FreeVerb.ar(Mix.ar(signal), revMix, room, revDamp);
-    var filtered = RLPF.ar(reverb, distance.linlin(0, 2.sqrt, 10000, 1000), 0.5);
-    var output = filtered * env * amp;
+    // var reverb = FreeVerb.ar(Mix.ar(signal), revMix, room, revDamp);
+    // var filtered = RLPF.ar(reverb, filtFreq, filtParam);
+    // var output = filtered * env * amp;
+
+    // reverb
+    var reverb = DelayN.ar(sig, 0.03, 0.03);
+    reverb = CombN.ar(reverb, 0.1, {Rand(0.01,0.099)}!32, decay);
+    reverb = SplayAz.ar(2, reverb);
+
+    // TODO: choose the type of filter
+    reverb = LPF.ar(reverb, filtFreq);
+    // reverb = RLPF.ar(reverb, filtFreq, filtParam);
+
+    5.do{reverb = AllpassN.ar(reverb, 0.1, {Rand(0.01,0.099)}!2, 3)};
+
+    // TODO: choose the type of filter
+    reverb = LPF.ar(reverb, filtFreq);
+    // reverb = RLPF.ar(reverb, filtFreq, filtParam);
+
+    sig = (reverb * revMix) + (sig * (1 - revMix));
+
+    sig = sig * env * amp;
 
     // report (single channel after effects before Splay)
-    SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(output));
+    SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(sig));
 
-    Out.ar(out, Splay.ar(output, spread:depth, center:azimuth))
+    Out.ar(out, Splay.ar(sig, spread:depth, center:azimuth))
 });
 
 

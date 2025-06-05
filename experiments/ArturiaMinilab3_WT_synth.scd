@@ -112,11 +112,12 @@ s.waitForBoot({
 
     // Define global variables to track parameter values
     ~detune = 1;
-    ~param2 = 1; // vacant
-    ~param3 = 1; // vacant
-    ~param4 = 5; // vacant
-    ~param5 = 1; // vacant
-    ~param6 = 1; // vacant
+    ~filtFreq=440;
+    ~filtParam=0.01;
+    ~filtType=0;
+    ~distance=0.1;
+    ~revDamp=0.5;
+    ~revMix=0.25;
     ~param7 = 1; // vacant
     ~fxsend = -20;
     ~cAtk = 4;
@@ -168,12 +169,18 @@ s.waitForBoot({
                 \fxsend, ~fxsend,
                 \cAtk, ~cAtk,
                 \cRel, ~cRel,
-                \amp, (vel / 127 * 0.5), // Scale velocity to amplitude
+                \amp, (vel / 127 * 0.8), // Scale velocity to amplitude
                 \atk, ~atk,
                 \decay, ~decay,
                 \sus, ~sus,
                 \rel, ~rel,
-                \pan, ~pan
+                \pan, ~pan,
+                \distance, ~distance,
+                \revDamp, ~revDamp,
+                \revMix, ~revMix,
+                \filtFreq, ~filtFreq,
+                \filtParam, ~filtParam,
+
             ]);
 
             // Store the synth in the dictionary with the note number as key
@@ -232,7 +239,7 @@ s.waitForBoot({
         }
 
         // Knobs for other parameters
-        { 1 } { // CC 1 (often Mod Wheel) to modulator ratio
+        { 1 } { // CC 1 (Mod Wheel) to modulator ratio
             setVal = ~mRatio = val.linlin(0, 127, 0.5, 8);
             setParm = "mRatio";
             ~synths.do({ |synth| synth.set(\mRatio, ~mRatio) });
@@ -246,6 +253,31 @@ s.waitForBoot({
             setVal = ~fxsend = if (val == 0) {-120} {\db.asSpec.map(val.linexp(0, 127, 0.001, 1.0))};
             setParm = "FX send";
             ~synths.do({ |synth| synth.set(\fxsend, ~fxsend) });
+        }
+        { 86 } { // CC 86 (Knob 1) to distance (reverb room)
+            setVal = ~distance = val.linlin(0, 127, 0, 2.sqrt);
+            setParm = "Reverb room";
+            ~synths.do({ |synth| synth.set(\distance, ~distance) });
+        }
+        { 87 } { // CC 87 (Knob 2) to revDamp
+            setVal = ~revDamp = val.linlin(0, 127, 0, 1);
+            setParm = "Reverb damp";
+            ~synths.do({ |synth| synth.set(\revDamp, ~revDamp) });
+        }
+        { 89 } { // CC 89 (Knob 3) to revMix
+            setVal = ~revMix = val.linlin(0, 127, 0, 1);
+            setParm = "Reverb mix (dry/wet)";
+            ~synths.do({ |synth| synth.set(\revMix, ~revMix) });
+        }
+        { 110 } { // CC 110 (Knob 5) to filtFreq
+            setVal = ~filtFreq = val.linlin(0, 127, 20, 4000);
+            setParm = "Filter Freq";
+            ~synths.do({ |synth| synth.set(\filtFreq, ~filtFreq) });
+        }
+        { 111 } { // CC 110 (Knob 6) to filtParam (RQ)
+            setVal = ~filtParam = val.linexp(0, 127, 0.01, 1.00);
+            setParm = "Filter RQ";
+            ~synths.do({ |synth| synth.set(\filtParam, ~filtParam) });
         };
 
         // Post MIDI event
