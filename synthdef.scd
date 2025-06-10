@@ -48,11 +48,7 @@ var makeSynthDefADSR = { |name, outCodeFunc|
         // synth specific args
         cutoff=1000, gain=2.5, reset=0;
 
-        var signal, trig, degree, env;
-
-        freq = freq * { Rand(-0.1, 0.1).midiratio }.dup(4);
-
-        signal = Saw.ar(freq);
+        var signal = Saw.ar(freq * { Rand(-0.1, 0.1).midiratio }.dup(4));
         signal = Mix.ar(signal);
         signal = MoogFF.ar(signal, cutoff, gain, reset);
 
@@ -216,14 +212,27 @@ makeSynthDefADSR.("s2", {
     // input signal
     var sig = Mix.ar(signal);
 
-    // envelope, reverb, filter
     var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
-    // var reverb = FreeVerb.ar(Mix.ar(signal), revMix, room, revDamp);
-    // var filtered = RLPF.ar(reverb, filtFreq, filtParam);
-    // var output = filtered * env * amp;
+
+	// filtered signal with smooth parameter changes
+	var lagTime = 1;
+	var filtTypeSmooth = Lag.kr(filtType, lagTime);
+	var filtFreqSmooth = Lag.kr(filtFreq, lagTime);
+	var filtParamSmooth = Lag.kr(filtParam, lagTime);
+
+	var filtered = SelectX.ar(
+		filtTypeSmooth.round, [
+			LPF.ar(signal, filtFreqSmooth),                     // 0: LPF
+			BPF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 1: BPF (rq)
+			BRF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 2: BRF (rq)
+			HPF.ar(signal, filtFreqSmooth),                     // 3: HPF (rq)
+			RLPF.ar(signal, filtFreqSmooth, filtParamSmooth),   // 5: RLPF (rq)
+			Resonz.ar(signal, filtFreqSmooth, filtParamSmooth), // 6: Resonz (bwr)
+		]
+	);
 
     // reverb
-    var reverb = DelayN.ar(sig, 0.03, 0.03);
+    var reverb = DelayN.ar(filtered, 0.03, 0.03);
     reverb = CombN.ar(reverb, 0.1, {Rand(0.01,0.099)}!32, decay);
     reverb = SplayAz.ar(2, reverb);
 
@@ -237,14 +246,14 @@ makeSynthDefADSR.("s2", {
     reverb = LPF.ar(reverb, filtFreq);
     // reverb = RLPF.ar(reverb, filtFreq, filtParam);
 
-    sig = (reverb * revMix) + (sig * (1 - revMix));
+    filtered = (reverb * revMix) + (filtered * (1 - revMix));
 
-    sig = sig * env * amp;
+    filtered = filtered * env * amp;
 
     // report (single channel after effects before Splay)
-    SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(sig));
+    SendTrig.kr(Impulse.kr(30), trigID, Amplitude.kr(filtered));
 
-    Out.ar(out, Splay.ar(sig, spread:depth, center:azimuth))
+    Out.ar(out, Splay.ar(filtered, spread:depth, center:azimuth))
 });
 
 

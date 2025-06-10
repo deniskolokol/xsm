@@ -16,7 +16,7 @@ var midiMapNO=#[ // for XSession - note on
     70, // Play Button Left
     58, // Cue Button Left
     45, // Headphone Button Right
-    56, 57, // << & >> Buttons Right
+	56, 57, // << & >> Buttons Right
     69, // Play Button Right
     59, // Cue Button Right
 ];
@@ -29,7 +29,7 @@ var midiNoteOnMap = Dictionary[ // for XSession - note on
     45 -> Dictionary[\descr -> "Headphone Button Right"],
     56 -> Dictionary[\descr -> "<< Button Right"],
     57 -> Dictionary[\descr -> ">> Button Right"],
-    69 -> Dictionary[\descr -> "Play Button Right"],
+	69 -> Dictionary[\descr -> "Play Button Right"],
     59 -> Dictionary[\descr -> "Cue Button Right"]
 ];
 var ctrlsList=Array.fill(midiMapCC.size, {nil});
@@ -393,7 +393,7 @@ ctrlEnv = arturiaEnvCtrls.(paneR);
 presetListSynths = arturiaButtons.(paneR);
 
 
-win.fullScreen;
+// win.fullScreen;
 win.front;
 
 

@@ -5,7 +5,7 @@ Server.default = s = Server.local;
 s.boot;
 
 ~rbus = Bus.audio(s, 2);
-~synthname = "osc";
+~synthname = "moogff__s2"; // "osc";
 
 s.waitForBoot({
 
@@ -113,7 +113,7 @@ s.waitForBoot({
     // Define global variables to track parameter values
     ~detune = 1;
     ~filtFreq=440;
-    ~filtParam=0.01;
+    ~filtParam=1.0;
     ~filtType=0;
     ~distance=0.1;
     ~revDamp=0.5;
@@ -144,7 +144,7 @@ s.waitForBoot({
         if (setParm.isNil) {
             ln = ln + format(" | val: %", val);
         } {
-            setVal = if (setVal.isFloat) { setVal.round(0.0001) };
+            if (setVal.isFloat) { setVal = setVal.round(0.0001) };
             ln = ln + format(" | val: % -> %  (%)", val, setVal, setParm);
         };
         postf("%\n", ln)
@@ -180,7 +180,7 @@ s.waitForBoot({
                 \revMix, ~revMix,
                 \filtFreq, ~filtFreq,
                 \filtParam, ~filtParam,
-
+				\filtType, ~filtType
             ]);
 
             // Store the synth in the dictionary with the note number as key
@@ -208,81 +208,96 @@ s.waitForBoot({
     });
 
     // MIDI CC handler function for knobs and sliders
-    MIDIdef.cc(\ccHandler, { |val, num, chan, src|
-        // Map CC numbers to synth parameters based on MiniLab 3 controls:
-        // update all playing synths with the new param value or simply
-        // display MIDI event info.
+	MIDIdef.cc(\ccHandler, { |val, num, chan, src|
+		// Map CC numbers to synth parameters based on MiniLab 3 controls:
+		// update all playing synths with the new param value or simply
+		// display MIDI event info.
 
-        var setParm=nil, setVal=nil;
+		var setParm=nil, setVal=nil;
+		var filtType = (
+			0: "LPF",
+			1: "BPF",
+			2: "BRF",
+			3: "HPF",
+			4: "RLPF",
+			5: "Resonz"
+		);
 
-        switch(num)
-        // Sliders 1-4 for ADSR envelope control
-        { 82 } { // Slider 1 for Attack time
-            setVal = ~atk = val.linexp(0, 127, 0.001, 2);
-            setParm = "Attack";
-            ~synths.do({ |synth| synth.set(\atk, ~atk) });
-        }
-        { 83 } { // Slider 2 for Decay time
-            setVal = ~decay = val.linexp(0, 127, 0.01, 3);
-            setParm = "Decay";
-            ~synths.do({ |synth| synth.set(\decay, ~decay) });
-        }
-        { 85 } { // Slider 3 for Sustain level
-            setVal = ~sus = val.linlin(0, 127, 0.0, 1.0);
-            setParm = "Sustain";
-            ~synths.do({ |synth| synth.set(\sus, ~sus) });
-        }
-        { 17 } { // Slider 4 for Release time
-            setVal = ~rel = val.linexp(0, 127, 0.01, 10);
-            setParm = "Release";
-            ~synths.do({ |synth| synth.set(\rel, ~rel) });
-        }
 
-        // Knobs for other parameters
-        { 1 } { // CC 1 (Mod Wheel) to modulator ratio
-            setVal = ~mRatio = val.linlin(0, 127, 0.5, 8);
-            setParm = "mRatio";
-            ~synths.do({ |synth| synth.set(\mRatio, ~mRatio) });
-        }
-        { 74 } { // CC 74 (Knob 1) to detune
-            setVal = ~detune = val.linlin(0, 127, 0.5, 8);
-            setParm = "Detune";
-            ~synths.do({ |synth| synth.set(\detune, ~detune) });
-        }
-        { 16 } { // CC 16 (Knob 8) to fxsend
-            setVal = ~fxsend = if (val == 0) {-120} {\db.asSpec.map(val.linexp(0, 127, 0.001, 1.0))};
-            setParm = "FX send";
-            ~synths.do({ |synth| synth.set(\fxsend, ~fxsend) });
-        }
-        { 86 } { // CC 86 (Knob 1) to distance (reverb room)
-            setVal = ~distance = val.linlin(0, 127, 0, 2.sqrt);
-            setParm = "Reverb room";
-            ~synths.do({ |synth| synth.set(\distance, ~distance) });
-        }
-        { 87 } { // CC 87 (Knob 2) to revDamp
-            setVal = ~revDamp = val.linlin(0, 127, 0, 1);
-            setParm = "Reverb damp";
-            ~synths.do({ |synth| synth.set(\revDamp, ~revDamp) });
-        }
-        { 89 } { // CC 89 (Knob 3) to revMix
-            setVal = ~revMix = val.linlin(0, 127, 0, 1);
-            setParm = "Reverb mix (dry/wet)";
-            ~synths.do({ |synth| synth.set(\revMix, ~revMix) });
-        }
-        { 110 } { // CC 110 (Knob 5) to filtFreq
-            setVal = ~filtFreq = val.linlin(0, 127, 20, 4000);
-            setParm = "Filter Freq";
-            ~synths.do({ |synth| synth.set(\filtFreq, ~filtFreq) });
-        }
-        { 111 } { // CC 110 (Knob 6) to filtParam (RQ)
-            setVal = ~filtParam = val.linexp(0, 127, 0.01, 1.00);
-            setParm = "Filter RQ";
-            ~synths.do({ |synth| synth.set(\filtParam, ~filtParam) });
-        };
+		switch(num)
+		// Sliders 1-4 for ADSR envelope control
+		{ 82 } { // Slider 1 for Attack time
+			setVal = ~atk = val.linexp(0, 127, 0.001, 2);
+			setParm = "Attack";
+			~synths.do({ |synth| synth.set(\atk, ~atk) });
+		}
+		{ 83 } { // Slider 2 for Decay time
+			setVal = ~decay = val.linexp(0, 127, 0.01, 3);
+			setParm = "Decay";
+			~synths.do({ |synth| synth.set(\decay, ~decay) });
+		}
+		{ 85 } { // Slider 3 for Sustain level
+			setVal = ~sus = val.linlin(0, 127, 0.0, 1.0);
+			setParm = "Sustain";
+			~synths.do({ |synth| synth.set(\sus, ~sus) });
+		}
+		{ 17 } { // Slider 4 for Release time
+			setVal = ~rel = val.linexp(0, 127, 0.01, 10);
+			setParm = "Release";
+			~synths.do({ |synth| synth.set(\rel, ~rel) });
+		}
 
-        // Post MIDI event
-        ~postMIDI.(val, num, chan, src, setParm, setVal);
-    });
+		// Knobs for other parameters
+		{ 1 } { // CC 1 (Mod Wheel) to modulator ratio
+			setVal = ~mRatio = val.linlin(0, 127, 0.5, 8);
+			setParm = "mRatio";
+			~synths.do({ |synth| synth.set(\mRatio, ~mRatio) });
+		}
+		{ 74 } { // CC 74 (Knob 1) to detune
+			setVal = ~detune = val.linlin(0, 127, 0.5, 8);
+			setParm = "Detune";
+			~synths.do({ |synth| synth.set(\detune, ~detune) });
+		}
+		{ 16 } { // CC 16 (Knob 8) to fxsend
+			setVal = ~fxsend = if (val == 0) {-120} {\db.asSpec.map(val.linexp(0, 127, 0.001, 1.0))};
+			setParm = "FX send";
+			~synths.do({ |synth| synth.set(\fxsend, ~fxsend) });
+		}
+		{ 86 } { // CC 86 (Knob 1) to distance (reverb room)
+			setVal = ~distance = val.linlin(0, 127, 0, 2.sqrt);
+			setParm = "Reverb room";
+			~synths.do({ |synth| synth.set(\distance, ~distance) });
+		}
+		{ 87 } { // CC 87 (Knob 2) to revDamp
+			setVal = ~revDamp = val.linlin(0, 127, 0, 1);
+			setParm = "Reverb damp";
+			~synths.do({ |synth| synth.set(\revDamp, ~revDamp) });
+		}
+		{ 89 } { // CC 89 (Knob 3) to revMix
+			setVal = ~revMix = val.linlin(0, 127, 0, 1);
+			setParm = "Reverb mix (dry/wet)";
+			~synths.do({ |synth| synth.set(\revMix, ~revMix) });
+		}
+		{ 110 } { // CC 110 (Knob 5) to filtFreq
+			setVal = ~filtFreq = val.linlin(0, 127, 20, 4000);
+			setParm = "Filter Freq";
+			~synths.do({ |synth| synth.set(\filtFreq, ~filtFreq) });
+		}
+		{ 111 } { // CC 110 (Knob 6) to filtParam (RQ)
+			setVal = ~filtParam = val.linexp(0, 127, 0.01, 1.00);
+			setParm = "Filter RQ";
+			~synths.do({ |synth| synth.set(\filtParam, ~filtParam) });
+		}
+		{ 116 } { // CC 116 (Knob 7) to filtType
+			~filtType = val.linlin(0, 127, 0, 5.499999);
+			setParm = "Filter Type";
+			setVal = filtType.at(~filtType.round.asInteger);
+			~synths.do({ |synth| synth.set(\filtType, ~filtType) });
+		};
+
+		// Post MIDI event
+		~postMIDI.(val, num, chan, src, setParm, setVal);
+	});
 
     // Function to display current parameters
     ~showParams = {
