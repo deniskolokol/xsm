@@ -215,13 +215,13 @@ makeSynthDefADSR.("s2", {
     var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
 
 	// filtered signal with smooth parameter changes
-	var lagTime = 1;
-	var filtTypeSmooth = Lag.kr(filtType, lagTime);
+	var lagTime = 1.0;
+	var filtTypeSmooth = Lag.kr(filtType.round, lagTime);
 	var filtFreqSmooth = Lag.kr(filtFreq, lagTime);
 	var filtParamSmooth = Lag.kr(filtParam, lagTime);
 
 	var filtered = SelectX.ar(
-		filtTypeSmooth.round, [
+		filtTypeSmooth, [
 			LPF.ar(signal, filtFreqSmooth),                     // 0: LPF
 			BPF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 1: BPF (rq)
 			BRF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 2: BRF (rq)

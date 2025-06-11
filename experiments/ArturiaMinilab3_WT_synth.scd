@@ -279,7 +279,7 @@ s.waitForBoot({
 			~synths.do({ |synth| synth.set(\revMix, ~revMix) });
 		}
 		{ 110 } { // CC 110 (Knob 5) to filtFreq
-			setVal = ~filtFreq = val.linlin(0, 127, 20, 4000);
+			setVal = ~filtFreq = val.linexp(0, 127, 20, 5000);
 			setParm = "Filter Freq";
 			~synths.do({ |synth| synth.set(\filtFreq, ~filtFreq) });
 		}
