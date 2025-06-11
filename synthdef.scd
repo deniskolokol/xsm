@@ -215,19 +215,16 @@ makeSynthDefADSR.("s2", {
     var env = Env.adsr(atk, decay, sus, rel, curve:[cAtk, cRel, cRel]).ar(Done.freeSelf, \gate.kr(1));
 
 	// filtered signal with smooth parameter changes
-	var lagTime = 1.0;
-	var filtTypeSmooth = Lag.kr(filtType.round, lagTime);
-	var filtFreqSmooth = Lag.kr(filtFreq, lagTime);
-	var filtParamSmooth = Lag.kr(filtParam, lagTime);
+	var filtTypeSmooth = Lag.kr(filtType.round, 0.5);
 
 	var filtered = SelectX.ar(
 		filtTypeSmooth, [
-			LPF.ar(signal, filtFreqSmooth),                     // 0: LPF
-			BPF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 1: BPF (rq)
-			BRF.ar(signal, filtFreqSmooth, filtParamSmooth),    // 2: BRF (rq)
-			HPF.ar(signal, filtFreqSmooth),                     // 3: HPF (rq)
-			RLPF.ar(signal, filtFreqSmooth, filtParamSmooth),   // 5: RLPF (rq)
-			Resonz.ar(signal, filtFreqSmooth, filtParamSmooth), // 6: Resonz (bwr)
+			LPF.ar(signal, filtFreq),               // 0: LPF
+			BPF.ar(signal, filtFreq, filtParam),    // 1: BPF (rq)
+			BRF.ar(signal, filtFreq, filtParam),    // 2: BRF (rq)
+			HPF.ar(signal, filtFreq),               // 3: HPF (rq)
+			RLPF.ar(signal, filtFreq, filtParam),   // 4: RLPF (rq)
+			Resonz.ar(signal, filtFreq, filtParam), // 5: Resonz (bwr)
 		]
 	);
 
@@ -235,16 +232,9 @@ makeSynthDefADSR.("s2", {
     var reverb = DelayN.ar(filtered, 0.03, 0.03);
     reverb = CombN.ar(reverb, 0.1, {Rand(0.01,0.099)}!32, decay);
     reverb = SplayAz.ar(2, reverb);
-
-    // TODO: choose the type of filter
-    reverb = LPF.ar(reverb, filtFreq);
-    // reverb = RLPF.ar(reverb, filtFreq, filtParam);
-
+	reverb = LPF.ar(reverb, filtFreq);
     5.do{reverb = AllpassN.ar(reverb, 0.1, {Rand(0.01,0.099)}!2, 3)};
-
-    // TODO: choose the type of filter
-    reverb = LPF.ar(reverb, filtFreq);
-    // reverb = RLPF.ar(reverb, filtFreq, filtParam);
+	reverb = LPF.ar(reverb, filtFreq);
 
     filtered = (reverb * revMix) + (filtered * (1 - revMix));
 
