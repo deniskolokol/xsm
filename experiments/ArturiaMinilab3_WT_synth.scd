@@ -223,7 +223,6 @@ s.waitForBoot({
 			5: "Resonz"
 		);
 
-
 		switch(num)
 		// Sliders 1-4 for ADSR envelope control
 		{ 82 } { // Slider 1 for Attack time
