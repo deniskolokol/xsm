@@ -92,29 +92,26 @@ var makeSynthDefADSR = { |name, outCodeFunc|
     }).add;
 
 
-	SynthDef(\osc, {
-		arg bufnum=0, in=30, out=0, trigID=80, freq=432, amp=1.0,
+	SynthDef("osc__" ++ name, {
+		arg bufnum=0, in=30, out=0, trigID=80, freq=432, detune=0.2, amp=1.0,
+            filtFreq=440, filtParam=1.0, filtType=0, revDamp=0.5, revMix=0.25,
+            pan=0, rout=0, rsend=(-20),
+            atk=0.01, dec=0.5, sus=1, rel=0.5, cAtk=3, cRel=(-3),
+            azimuth= -0.5pi, distance=0.1, elevation=0, depth=5, elevClip=0.01pi;
 
-		arg buf=0, freq=200, detune=0.2,
-		amp=0.2, pan=0, out=0, rout=0, rsend=(-20),
-		atk=0.01, sus=1, rel=0.01, c0=1, c1=(-1);
-		var sig, env, detuneCtrl;
-		env = EnvGen.ar(
-			Env([0,1,1,0],[atk,sus,rel],[c0,0,c1]),
-			doneAction:2
-		);
+        // Array of eight Oscs with uniquely detune frequencies
+        // and unique initial phase offsets
+		var detuneCtrl = LFNoise1.kr(0.1!8).bipolar(detune).midiratio;
+		var signal = Osc.ar(bufnum, freq * detuneCtrl, {Rand(0,2pi)}!8);
 
-		//array of eight Oscs with uniquely detune frequencies
-		//and unique initial phase offsets
-		detuneCtrl = LFNoise1.kr(0.1!8).bipolar(detune).midiratio;
-		sig = Osc.ar(buf, freq * detuneCtrl, {Rand(0,2pi)}!8);
+		signal = Splay.ar(signal); //spread 8 signals over stereo field
+		signal = LeakDC.ar(signal); //remove DC bias
 
-		sig = Splay.ar(sig); //spread 8 signals over stereo field
-		sig = LeakDC.ar(sig); //remove DC bias
-		sig = Balance2.ar(sig[0], sig[1], pan, amp); //L/R balance (pan)
-		sig = sig * env;
-		Out.ar(out, sig);
-		Out.ar(rout, sig * rsend.dbamp); //"post-fader" send to reverb
+        outCodeFunc.(
+            signal, amp, out, trigID, azimuth, distance, elevation, elevClip, depth,
+            filtFreq, filtParam, filtType, revDamp, revMix,
+            atk, dec, sus, rel, cAtk, cRel
+        );
 	}).add;
 
 
