@@ -5,7 +5,7 @@ Server.default = s = Server.local;
 s.boot;
 
 ~rbus = Bus.audio(s, 2);
-~synthname = "moogff__s2"; // "osc";
+~synthname = "osc"; // "moogff__s2"; // "osc";
 
 s.waitForBoot({
 
@@ -127,6 +127,8 @@ s.waitForBoot({
     ~sus = 0.5;
     ~rel = 1;
     ~pan = 0;
+    ~index = 1;
+    ~iScale = 5;
 
     // Dictionary to store active notes and synths
     ~notes = Dictionary.new;
@@ -175,6 +177,8 @@ s.waitForBoot({
                 \sus, ~sus,
                 \rel, ~rel,
                 \pan, ~pan,
+                \index, ~index,
+                \iScale, ~iScale,
                 \distance, ~distance,
                 \revDamp, ~revDamp,
                 \revMix, ~revMix,
@@ -277,6 +281,11 @@ s.waitForBoot({
 			setParm = "Reverb mix (dry/wet)";
 			~synths.do({ |synth| synth.set(\revMix, ~revMix) });
 		}
+        {90} { // CC 90 (Knob 4) to iScale
+            setVal = ~iScale = val.linlin(0, 127, 1, 15);
+            setParm = "iScale";
+            ~synths.do({ |synth| synth.set(\iScale, ~iScale) });
+        }
 		{ 110 } { // CC 110 (Knob 5) to filtFreq
 			setVal = ~filtFreq = val.linexp(0, 127, 20, 5000);
 			setParm = "Filter Freq";
@@ -292,7 +301,12 @@ s.waitForBoot({
 			setParm = "Filter Type";
 			setVal = filtType.at(~filtType.round.asInteger);
 			~synths.do({ |synth| synth.set(\filtType, ~filtType) });
-		};
+		}
+        {117} { // CC 117 (Knob 8) to index
+            setVal = ~index = val.linlin(0, 127, 0.1, 10);
+			setParm = "Mod Index";
+            ~synths.do({ |synth| synth.set(\index, ~index) });
+        };
 
 		// Post MIDI event
 		~postMIDI.(val, num, chan, src, setParm, setVal);
