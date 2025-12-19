@@ -194,7 +194,7 @@ Server.default.waitForBoot {
 plates.add([]);
 
 // GUI.
-win = Window("XSM 0.01", Rect(0, 0, width, height)).background_(colorBg);
+win = Window("XSM 0.01", Rect(0, 0, width, height), resizable: false).background_(colorBg);
 win.view.decorator = FlowLayout(win.view.bounds, margin@margin, gap@gap);
 
 paneL = compViewFlow.(win, 0.35, 0.95, colorPane);
