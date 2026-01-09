@@ -107,7 +107,7 @@ var knob = { |par, label, spec, action, initVal, layout=\vert2, bounds|
     .setColors(
         stringColor:Color.white,
         numBackground:Color.grey,
-        knobColors:[Color.white, Color.grey, Color.white, Color.red],
+        knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red],
         numNormalColor:Color.yellow,
     )
 };
@@ -339,7 +339,7 @@ arturiaMasterKnob = { |parent|
         { |ez| ez.value.postln },
         bounds:arturiaKnobSize@arturiaKnobSize
     )
-    .setColors(knobColors:[Color.white, Color.grey, Color.white, Color.black]);
+    .setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
 };
 
 arturiaKnobs = { |parent|
@@ -356,7 +356,7 @@ arturiaKnobs = { |parent|
         );
 
         // change standard colors
-        kn.setColors(knobColors:[Color.white, Color.grey, Color.white, Color.black]);
+        kn.setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
         knList.add(kn)
     };
 
