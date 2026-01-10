@@ -170,6 +170,7 @@ var dropdown = { |par, label, items, action, initVal=0, scale=1|
     .font_(fontHead)
 };
 
+Server.default = s = Server.local;
 
 // Wait for Server to boot
 Server.default.waitForBoot {
@@ -186,288 +187,288 @@ Server.default.waitForBoot {
     } {
         postf("\nWARNING: could not load Synth Params!\n\n")
     };
-};
 
-// Plates and decks.
-// Plate is always a pair of decks: 0 is Left, 1 is Right.
-// -- bookmark --
-plates.add([]);
+    // Plates and decks.
+    // Plate is always a pair of decks: 0 is Left, 1 is Right.
+    // -- bookmark --
+    plates.add([]);
 
-// GUI.
-win = Window("XSM 0.01", Rect(0, 0, width, height), resizable: false).background_(colorBg);
-win.view.decorator = FlowLayout(win.view.bounds, margin@margin, gap@gap);
+    // GUI.
+    win = Window("XSM 0.01", Rect(0, 0, width, height), resizable: false).background_(colorBg);
+    win.view.decorator = FlowLayout(win.view.bounds, margin@margin, gap@gap);
 
-paneL = compViewFlow.(win, 0.35, 0.95, colorPane);
-paneR = compViewFlow.(win, 0.648, 0.95, colorPane);
-paneStatus = compViewFlow.(win, 0.998, 0.047, colorPane);
+    paneL = compViewFlow.(win, 0.35, 0.95, colorPane);
+    paneR = compViewFlow.(win, 0.648, 0.95, colorPane);
+    paneStatus = compViewFlow.(win, 0.998, 0.047, colorPane);
 
 
-// ---------- LEFT DECK ----------
-// GUI: synth ctrl section.
-makeCtlStripe = { |place, deck|
-    var pn;
-    var parent = compViewFlow.(place, 0.498, 0.9);
+    // ---------- LEFT DECK ----------
+    // GUI: synth ctrl section.
+    makeCtlStripe = { |place, deck|
+        var pn;
+        var parent = compViewFlow.(place, 0.498, 0.9);
 
-    // Synth selector.
-    dropdown.(parent,
-        items: ~synthParams.values.collect(_.at(\name)),
-        initVal: deck,
-        action: { |dd| dd.postln },
-    );
+        // Synth selector.
+        dropdown.(parent,
+            items: ~synthParams.values.collect(_.at(\name)),
+            initVal: deck,
+            action: { |dd| dd.postln },
+        );
 
-    // Stripes of knobs.
-    2.do {
-        pn = compViewFlow.(parent, 0.498, 0.49);
-        3.do { |j|
-            // The same number of elements as in midiMapCC
+        // Stripes of knobs.
+        2.do {
+            pn = compViewFlow.(parent, 0.498, 0.49);
+            3.do { |j|
+                // The same number of elements as in midiMapCC
+                ctrlsList.put(
+                    currCtrl,
+                    knob.(
+                        pn,
+                        " test ",
+                        \freq.asSpec,
+                        { |ez| ctlBus[currCtrl].value = ez.value },
+                        bounds:knobWidth@knobHeight
+                    );
+                );
+
+                // The same idea, but indexing ctrl buses.
+                currCtrl = currCtrl + 1;
+            };
+        };
+
+        // Button.
+        compViewFlow.(parent, 0.3, 0.05);
+        pn = compViewFlow.(parent, 0.69, 0.05);
+
+        // TODO: Proper labels:
+        //       Left deck:
+        //       - if current deck == 0: disabled
+        //       - otherwise enabled and label "< PLATE"
+        //       Right deck:
+        //       - if current deck == maxDecks: disabled
+        //       - if current deck is the last created, label "PLATE +"
+        //       - if current deck is not the last created, label "PLATE >"
+        button.(pn, "< PLATE", { |bt| bt.value.postln }, 0.5, 0.9);
+
+        // 2 sliders.
+        2.do { |j|
+            compViewFlow.(parent, 0.15, 0.3); // panel before
+            pn = compViewFlow.(parent, 0.208, 0.3);
+            // the same number of elements as in midiMapCC
             ctrlsList.put(
                 currCtrl,
-                knob.(
+                slider.(
                     pn,
-                    " test ",
-                    \freq.asSpec,
+                    " Vol  ",
+                    \db.asSpec.step_(0.01),
                     { |ez| ctlBus[currCtrl].value = ez.value },
-                    bounds:knobWidth@knobHeight
-                );
+                    layout: \vert
+                )
             );
+            compViewFlow.(parent, 0.15, 0.3); // panel after
 
-            // The same idea, but indexing ctrl buses.
-            currCtrl = currCtrl + 1;
+            currCtrl = currCtrl+1; // the same idea, but indexing ctrl buses
         };
+
+        // // Presets buttons.
+        // pn = compViewFlow.(parent, 0.99, 0.1);
+        // // TODO: toggle buttons
+        // 10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.1, 0.1)};
     };
 
-    // Button.
-    compViewFlow.(parent, 0.3, 0.05);
-    pn = compViewFlow.(parent, 0.69, 0.05);
+    // GUI: synth ctrl section.
+    makeTranspStripe = { |parent|
+        var pn, scaleW=0.33, scaleH=0.1;
 
-    // TODO: Proper labels:
-    //       Left deck:
-    //       - if current deck == 0: disabled
-    //       - otherwise enabled and label "< PLATE"
-    //       Right deck:
-    //       - if current deck == maxDecks: disabled
-    //       - if current deck is the last created, label "PLATE +"
-    //       - if current deck is not the last created, label "PLATE >"
-    button.(pn, "< PLATE", { |bt| bt.value.postln }, 0.5, 0.9);
+        // Transpost/Control buttons Left.
+        pn = compViewFlow.(parent, scaleW, scaleH);
+        button.(pn, "<<", { |bt| bt.value.postln }, 0.49, 0.4);
+        button.(pn, ">>", { |bt| bt.value.postln }, 0.49, 0.4);
+        button.(pn, ">/||", { |bt| bt.value.postln }, 0.49, 0.58);
+        midiNoteOnMap.at(58).put(
+            \gui,
+            button.(pn, "_V_", { |bt| changeSynth.(0) }, 0.49, 0.58)
+        );
 
-    // 2 sliders.
-    2.do { |j|
-        compViewFlow.(parent, 0.15, 0.3); // panel before
-        pn = compViewFlow.(parent, 0.208, 0.3);
-        // the same number of elements as in midiMapCC
+        // Mix slider.
+        pn = compViewFlow.(parent, scaleW, scaleH);
         ctrlsList.put(
             currCtrl,
             slider.(
                 pn,
-                " Vol  ",
-                \db.asSpec.step_(0.01),
+                " MIX ",
+                \bipolar.asSpec,
                 { |ez| ctlBus[currCtrl].value = ez.value },
-                layout: \vert
+                layout:\line2,
+                scaleH:0.9
             )
         );
-        compViewFlow.(parent, 0.15, 0.3); // panel after
 
-        currCtrl = currCtrl+1; // the same idea, but indexing ctrl buses
+        // Transpost/Control buttons Right.
+        pn = compViewFlow.(parent, scaleW, scaleH);
+        button.(pn, "<<", { |bt| bt.value.postln }, 0.49, 0.4);
+        button.(pn, ">>", { |bt| bt.value.postln }, 0.49, 0.4);
+        button.(pn, ">/||", { |bt| bt.value.postln }, 0.49, 0.58);
+        midiNoteOnMap.at(59).put(
+            \gui,
+            button.(pn, "_V_", { |bt| changeSynth.(1) }, 0.49, 0.58)
+        );
     };
 
-    // // Presets buttons.
-    // pn = compViewFlow.(parent, 0.99, 0.1);
-    // // TODO: toggle buttons
-    // 10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.1, 0.1)};
-};
-
-// GUI: synth ctrl section.
-makeTranspStripe = { |parent|
-    var pn, scaleW=0.33, scaleH=0.1;
-
-    // Transpost/Control buttons Left.
-    pn = compViewFlow.(parent, scaleW, scaleH);
-    button.(pn, "<<", { |bt| bt.value.postln }, 0.49, 0.4);
-    button.(pn, ">>", { |bt| bt.value.postln }, 0.49, 0.4);
-    button.(pn, ">/||", { |bt| bt.value.postln }, 0.49, 0.58);
-    midiNoteOnMap.at(58).put(
-        \gui,
-        button.(pn, "_V_", { |bt| changeSynth.(0) }, 0.49, 0.58)
-    );
-
-    // Mix slider.
-    pn = compViewFlow.(parent, scaleW, scaleH);
-    ctrlsList.put(
-        currCtrl,
-        slider.(
-            pn,
-            " MIX ",
-            \bipolar.asSpec,
-            { |ez| ctlBus[currCtrl].value = ez.value },
-            layout:\line2,
-            scaleH:0.9
-        )
-    );
-
-    // Transpost/Control buttons Right.
-    pn = compViewFlow.(parent, scaleW, scaleH);
-    button.(pn, "<<", { |bt| bt.value.postln }, 0.49, 0.4);
-    button.(pn, ">>", { |bt| bt.value.postln }, 0.49, 0.4);
-    button.(pn, ">/||", { |bt| bt.value.postln }, 0.49, 0.58);
-    midiNoteOnMap.at(59).put(
-        \gui,
-        button.(pn, "_V_", { |bt| changeSynth.(1) }, 0.49, 0.58)
-    );
-};
-
-makeCtlStripe.(paneL, 0);
-makeCtlStripe.(paneL, 1);
-makeTranspStripe.(paneL);
+    makeCtlStripe.(paneL, 0);
+    makeCtlStripe.(paneL, 1);
+    makeTranspStripe.(paneL);
 
 
-// ---------- RIGHT DECK ----------
-//
-// Arturia view
-arturiaMasterKnob = { |parent|
-    var pn = compViewFlow.(parent, 0.12, 0.28, color:colorBg, margin:10, gap:5);
+    // ---------- RIGHT DECK ----------
+    //
+    // Arturia view
+    arturiaMasterKnob = { |parent|
+        var pn = compViewFlow.(parent, 0.12, 0.28, color:colorBg, margin:10, gap:5);
 
-    StaticText(pn, (pn.bounds.width-20)@(pn.bounds.height/2.3))
-    .align_(\center)
-    .font_(fontHead)
-    .stringColor_(Color.white)
-    .string_("Ch 1");
+        StaticText(pn, (pn.bounds.width-20)@(pn.bounds.height/2.3))
+        .align_(\center)
+        .font_(fontHead)
+        .stringColor_(Color.white)
+        .string_("Ch 1");
 
-    knob.(
-        pn,
-        " test ",
-        \freq.asSpec,
-        { |ez| ez.value.postln },
-        bounds:arturiaKnobSize@arturiaKnobSize
-    )
-    .setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
-};
-
-arturiaKnobs = { |parent|
-    var pn = compViewFlow.(parent, 0.43, 0.28, color:colorBg, margin:10, gap:5);
-    var knobSize = 100;
-    var kn, knList = List.new;
-    8.do {
-        kn = knob.(
+        knob.(
             pn,
             " test ",
             \freq.asSpec,
             { |ez| ez.value.postln },
-            bounds:knobSize@knobSize
+            bounds:arturiaKnobSize@arturiaKnobSize
+        )
+        .setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
+    };
+
+    arturiaKnobs = { |parent|
+        var pn = compViewFlow.(parent, 0.43, 0.28, color:colorBg, margin:10, gap:5);
+        var knobSize = 100;
+        var kn, knList = List.new;
+        8.do {
+            kn = knob.(
+                pn,
+                " test ",
+                \freq.asSpec,
+                { |ez| ez.value.postln },
+                bounds:knobSize@knobSize
+            );
+
+            // change standard colors
+            kn.setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
+            knList.add(kn)
+        };
+
+        // return list of GUI elements
+        knList
+    };
+
+    arturiaEnvCtrls = { |parent|
+        var pn = compViewFlow.(parent, 0.45, 0.28, color:colorBg, margin:10, gap:5);
+        var envPlot = Plotter("plot", Rect(0, 0, pn.bounds.width-20, pn.bounds.height-20), parent:pn);
+        envPlot.value = Env.adsr(0.5, 1, 0.5, 1, curve:[0.5, -4, -3]).asSignal(512);
+        envPlot.setProperties(
+            \fontColor, Color(0.5, 1, 0),
+            \plotColor, Color.red,
+            \backgroundColor, colorBg,
+            \gridColorX, Color.yellow(0.5),
+            \gridColorY, Color.yellow(0.5),
+            \labelX, "ADSR",
+            \labelFontColor, Color.white
         );
-
-        // change standard colors
-        kn.setColors(knobColors:[Color.grey(0.1), Color.red, Color.white, Color.red]);
-        knList.add(kn)
+        envPlot.refresh;
     };
 
-    // return list of GUI elements
-    knList
-};
 
-arturiaEnvCtrls = { |parent|
-    var pn = compViewFlow.(parent, 0.45, 0.28, color:colorBg, margin:10, gap:5);
-    var envPlot = Plotter("plot", Rect(0, 0, pn.bounds.width-20, pn.bounds.height-20), parent:pn);
-    envPlot.value = Env.adsr(0.5, 1, 0.5, 1, curve:[0.5, -4, -3]).asSignal(512);
-    envPlot.setProperties(
-        \fontColor, Color(0.5, 1, 0),
-        \plotColor, Color.red,
-        \backgroundColor, colorBg,
-        \gridColorX, Color.yellow(0.5),
-        \gridColorY, Color.yellow(0.5),
-        \labelX, "ADSR",
-        \labelFontColor, Color.white
+    arturiaButtons = { |parent|
+        var pn = compViewFlow.(parent, 0.998, 0.12, color:colorBg, margin:15, gap:10);
+        10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.095, 0.8)};
+    };
+
+
+    arturiaMasterKnob.(paneR);
+    ctrlsListSynth = arturiaKnobs.(paneR);
+    ctrlEnv = arturiaEnvCtrls.(paneR);
+    presetListSynths = arturiaButtons.(paneR);
+
+
+    // win.fullScreen;
+    win.front;
+
+
+    // MIDI.
+    makeMIDI = {
+        "> Initializing MIDI sources...".postln;
+        if(MIDIClient.initialized.not) {
+            MIDIClient.init;
+        } {
+            MIDIClient.list;
+        };
+        MIDIIn.connectAll;
+    };
+
+    midiFunc.add(
+        // MIDI control messages.
+        MIDIFunc.cc({
+            arg ...args;
+            (["CC"] ++ args).postln;
+            // |val, num|
+            // var midiMapCCIndex = -1, errCode=0;
+            // [val, num].postln;
+            // try { midiMapCCIndex = midiMapCC.indexOf(num) }{ errCode = 1 };
+            // if(errCode.booleanValue.not, {
+            //     [num, midiMapCCIndex].postln;
+            //     { ctrlsList[midiMapCCIndex].valueAction_(val.linlin(0, 127, 0, 1)) }.defer;
+            // });
+        })
     );
-    envPlot.refresh;
-};
 
+    midiFunc.add(
+        // MIDI Note On messages.
+        MIDIFunc.noteOn({
+            |val, num|
+            { midiNoteOnMap.at(num)[\gui].valueAction_(val) }.defer
+        })
+    );
 
-arturiaButtons = { |parent|
-    var pn = compViewFlow.(parent, 0.998, 0.12, color:colorBg, margin:15, gap:10);
-    10.do { |j| button.(pn, (j+1).asString, { |bt| bt.value.postln }, 0.095, 0.8)};
-};
+    midiFunc.add(
+        // MIDI Note On messages.
+        MIDIFunc.noteOff({
+            arg ...args;
+            (["note OFF"] ++ args).postln;
+            // |val, num|
+            // ["note OFF", val, num].postln;
+            // midiNoteOnMap.at(num).at(\gui).action.(0);
+        })
+    );
 
+    // // Initialize MIDI.
+    // makeMIDI.();
 
-arturiaMasterKnob.(paneR);
-ctrlsListSynth = arturiaKnobs.(paneR);
-ctrlEnv = arturiaEnvCtrls.(paneR);
-presetListSynths = arturiaButtons.(paneR);
+    //
+    cleanup = {
+        "> Cleaning up...".postln;
+        "> Resetting bus counter...".postln;
+        s.newBusAllocators;
 
+        "> Freeing MIDI...".postln;
+        midiFunc.do(_.free);
 
-// win.fullScreen;
-win.front;
-
-
-// MIDI.
-makeMIDI = {
-    "> Initializing MIDI sources...".postln;
-    if(MIDIClient.initialized.not) {
-        MIDIClient.init;
-    } {
-        MIDIClient.list;
+        "> Removing all functions...".postln;
+        ServerBoot.removeAll;
+        ServerTree.removeAll;
+        ServerQuit.removeAll;
     };
-    MIDIIn.connectAll;
-};
-
-midiFunc.add(
-    // MIDI control messages.
-    MIDIFunc.cc({
-        arg ...args;
-        (["CC"] ++ args).postln;
-        // |val, num|
-        // var midiMapCCIndex = -1, errCode=0;
-        // [val, num].postln;
-        // try { midiMapCCIndex = midiMapCC.indexOf(num) }{ errCode = 1 };
-        // if(errCode.booleanValue.not, {
-        //     [num, midiMapCCIndex].postln;
-        //     { ctrlsList[midiMapCCIndex].valueAction_(val.linlin(0, 127, 0, 1)) }.defer;
-        // });
-    })
-);
-
-midiFunc.add(
-    // MIDI Note On messages.
-    MIDIFunc.noteOn({
-        |val, num|
-        { midiNoteOnMap.at(num)[\gui].valueAction_(val) }.defer
-    })
-);
-
-midiFunc.add(
-    // MIDI Note On messages.
-    MIDIFunc.noteOff({
-        arg ...args;
-        (["note OFF"] ++ args).postln;
-        // |val, num|
-        // ["note OFF", val, num].postln;
-        // midiNoteOnMap.at(num).at(\gui).action.(0);
-    })
-);
-
-// // Initialize MIDI.
-// makeMIDI.();
-
-//
-cleanup = {
-    "> Cleaning up...".postln;
-    "> Resetting bus counter...".postln;
-    s.newBusAllocators;
-
-    "> Freeing MIDI...".postln;
-    midiFunc.do(_.free);
-
-    "> Removing all functions...".postln;
-    ServerBoot.removeAll;
-    ServerTree.removeAll;
-    ServerQuit.removeAll;
-};
 
 
-// What should be done when the window is closed.
-win.onClose = {
-    cleanup.()
-};
+    // What should be done when the window is closed.
+    win.onClose = {
+        cleanup.()
+    };
 
-CmdPeriod.doOnce({
-    win.close;
-});
+    CmdPeriod.doOnce({
+        win.close;
+    });
+    }; // end of Server.default.waitForBoot
 )
