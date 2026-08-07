@@ -529,7 +529,7 @@ var section_SignalFlowGraph = {
         resizable: false
     );
     ~win.view.decorator = FlowLayout(~win.view.bounds);
-    ~win.view.decorator.gap=gap@gap;    
+    ~win.view.decorator.gap=gap@gap;
     palette.setColor(colorBg, \window);
     ~win.view.palette = palette;
 

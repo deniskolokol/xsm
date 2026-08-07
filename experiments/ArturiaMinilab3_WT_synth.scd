@@ -4,8 +4,9 @@
 Server.default = s = Server.local;
 s.boot;
 
+~mainOut = 2; // Main audio output bus
 ~rbus = Bus.audio(s, 2);
-~synthname = "osc"; // "moogff__s2"; // "osc";
+~synthname = "osc"; // "moogff__s2";
 
 s.waitForBoot({
 
@@ -106,7 +107,7 @@ s.waitForBoot({
     s.sync;
 
     // Instantiate reverb
-    Synth(\reverb, [\in, ~rbus]);
+    Synth(\reverb, [\in, ~rbus, \out, ~mainOut]);
 
     s.sync;
 
@@ -131,7 +132,6 @@ s.waitForBoot({
     ~iScale = 5;
 
     // Dictionary to store active notes and synths
-    ~notes = Dictionary.new;
     ~synths = Dictionary.new;
 
     // List all available MIDI devices
@@ -167,6 +167,7 @@ s.waitForBoot({
                 \freq, freq,
                 \buf, ~wt_buf[0..3].choose,
                 \detune, ~detune,
+                \out, ~mainOut,
                 \fx, ~rbus,
                 \fxsend, ~fxsend,
                 \cAtk, ~cAtk,
